@@ -111,6 +111,15 @@ function multiplyResults(a, b) {
   const prefix = a.prefix || b.prefix;
   const unit = a.unit || b.unit;
   const unitGroup = a.unitGroup || b.unitGroup;
+  // Cross-group: speed * time = length (in km), or time * speed
+  if ((a.unitGroup === 'speed' && b.unitGroup === 'time') ||
+      (a.unitGroup === 'time' && b.unitGroup === 'speed')) {
+    const spd = a.unitGroup === 'speed' ? a : b;
+    const tm = a.unitGroup === 'time' ? a : b;
+    const speedKph = toBase(spd.value, spd.unit).value;
+    const timeHr = toBase(tm.value, tm.unit).value / 3600;
+    return result(speedKph * timeHr, prefix, 'km', 'length');
+  }
   // For multiplication, one side should be unitless
   if (a.unitGroup && b.unitGroup) {
     // Both have units — multiply raw values, keep first unit
@@ -126,6 +135,18 @@ function divideResults(a, b) {
   if (a.unitGroup && b.unitGroup && a.unitGroup === b.unitGroup) {
     const merged = mergeUnits(a, b);
     return result(merged.aBase / merged.bBase, prefix);
+  }
+  // Cross-group: length / speed = time (in hours)
+  if (a.unitGroup === 'length' && b.unitGroup === 'speed') {
+    const lengthKm = toBase(a.value, a.unit).value / 1000000;
+    const speedKph = toBase(b.value, b.unit).value;
+    return result(lengthKm / speedKph, prefix, 'hr', 'time');
+  }
+  // Cross-group: length / time = speed (in kph)
+  if (a.unitGroup === 'length' && b.unitGroup === 'time') {
+    const lengthKm = toBase(a.value, a.unit).value / 1000000;
+    const timeHr = toBase(b.value, b.unit).value / 3600;
+    return result(lengthKm / timeHr, prefix, 'kph', 'speed');
   }
   return result(a.value / b.value, prefix, a.unit, a.unitGroup);
 }
@@ -247,9 +268,13 @@ export function getGrammarAndSemantics() {
       const l = left.eval(s);
       const r = right.eval(s);
       const opStr = op.sourceString.trim();
-      if (opStr === '-' || opStr === 'minus' || opStr === 'without') {
-        return subtractResults(l, r);
+      const isSub = opStr === '-' || opStr === 'minus' || opStr === 'without';
+      // Percent modifier: X + 30% = X * 1.3, X - 30% = X * 0.7
+      if (r.isPercent && !l.isPercent) {
+        const factor = isSub ? (1 - r.value) : (1 + r.value);
+        return result(l.value * factor, l.prefix, l.unit, l.unitGroup);
       }
+      if (isSub) return subtractResults(l, r);
       return addResults(l, r);
     },
     Expression(node) { return node.eval(this.args.state); },
@@ -316,6 +341,31 @@ export function getGrammarAndSemantics() {
       const unit = normalizeUnit(suffix.sourceString);
       const group = UNIT_TO_GROUP[unit];
       return result(raw, '', unit, group || null);
+    },
+
+    // --- Bare percent (modifier) ---
+    Percent(num, _pct) {
+      const p = parseFloat(num.sourceString);
+      const r = result(p / 100);
+      r.isPercent = true;
+      return r;
+    },
+
+    // --- Time in year ---
+    TimeInYear(unitWord, _inKw, yearNum) {
+      const unit = unitWord.sourceString.trim().toLowerCase();
+      const year = parseInt(yearNum.sourceString);
+      const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+      const daysInYear = isLeap ? 366 : 365;
+      let value;
+      if (unit === 'months' || unit === 'month') value = 12;
+      else if (unit === 'weeks' || unit === 'week') value = daysInYear / 7;
+      else if (unit === 'days' || unit === 'day') value = daysInYear;
+      else if (unit === 'hours' || unit === 'hour') value = daysInYear * 24;
+      else if (unit === 'minutes' || unit === 'minute') value = daysInYear * 24 * 60;
+      else if (unit === 'seconds' || unit === 'second') value = daysInYear * 24 * 3600;
+      else value = 0;
+      return result(value);
     },
 
     // --- Percentages ---
@@ -422,6 +472,7 @@ export function getGrammarAndSemantics() {
     asKw(_) { return null; },
     aKw(_) { return null; },
     pctWord(_) { return null; },
+    timeUnitWord(_) { return null; },
     reserved(_) { return null; },
     nameStart(_) { return null; },
     nameRest(_) { return null; },

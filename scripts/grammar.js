@@ -47,6 +47,8 @@ TinySums {
     | PercentOff
     | PercentOf
     | PercentOn
+    | Percent
+    | TimeInYear
     | Quantity
     | Currency
     | NumberLit
@@ -54,6 +56,20 @@ TinySums {
     | Prev
     | Average
     | VariableRef
+
+  Percent
+    = number "%"
+
+  TimeInYear
+    = timeUnitWord inKw number
+
+  timeUnitWord
+    = "weeks" ~alnum | "week" ~alnum
+    | "months" ~alnum | "month" ~alnum
+    | "days" ~alnum | "day" ~alnum
+    | "hours" ~alnum | "hour" ~alnum
+    | "minutes" ~alnum | "minute" ~alnum
+    | "seconds" ~alnum | "second" ~alnum
 
   // --- Aggregation keywords ---
   Sum

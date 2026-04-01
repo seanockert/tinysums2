@@ -40,7 +40,7 @@ export function highlightLine(line, definedVars) {
   result = result.replace(/(?<!<span[^>]*>)(?<![.$€£\d])(\d+(?:\.\d+)?[Kk]?)(?![^<]*<\/span>)/g, '<span class="hl-number">$1</span>');
 
   // Keywords
-  result = result.replace(/\b(sum|total|now|today|prev|previous|avg|average)\b/gi, '<span class="hl-keyword">$1</span>');
+  result = result.replace(/\b(sum|total|now|today|prev|previous|avg|average|weeks?|months?|days?|hours?|minutes?|seconds?)\b/gi, '<span class="hl-keyword">$1</span>');
 
   // Word operators
   result = result.replace(/\b(plus|minus|times|divided by|divided|and|with|without|at|off|on|of|pa|from now|from|in|as a percentage|as a percent|as|percentage|percent)\b/gi, '<span class="hl-operator">$1</span>');

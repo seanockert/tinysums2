@@ -18,6 +18,12 @@ export function formatResult(res) {
     return formatDate(new Date(res.value));
   }
 
+  // Bare percentage
+  if (res.isPercent) {
+    const pct = Math.round(res.value * 10000) / 100;
+    return numberFormatter.format(pct) + '%';
+  }
+
   const rounded = Math.round(res.value * 100) / 100;
 
   // Currency
