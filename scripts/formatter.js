@@ -13,6 +13,11 @@ const numberFormatter = new Intl.NumberFormat('en-US', {
 export function formatResult(res) {
   if (!res || res.value === undefined) return '';
 
+  // Timezone conversion result
+  if (res.timezone) {
+    return formatTimeInZone(new Date(res.value), res.timezone.iana, res.timezone.label);
+  }
+
   // Date/time result (value is a timestamp)
   if (res.value > 1e12 && !res.prefix && !res.unit) {
     return formatDate(new Date(res.value));
@@ -27,6 +32,12 @@ export function formatResult(res) {
   const rounded = Math.round(res.value * 100) / 100;
 
   // Currency
+  if (res.currencyCode) {
+    if (res.prefix) {
+      return res.prefix + currencyFormatter.format(rounded);
+    }
+    return currencyFormatter.format(rounded) + ' ' + res.currencyCode.toUpperCase();
+  }
   if (res.prefix) {
     return res.prefix + currencyFormatter.format(rounded);
   }
@@ -50,6 +61,16 @@ export function formatResult(res) {
 
   // Plain number
   return numberFormatter.format(rounded);
+}
+
+function formatTimeInZone(date, ianaZone, label) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: ianaZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return fmt.format(date).toLowerCase() + ' ' + label;
 }
 
 function formatDate(date) {

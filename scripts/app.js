@@ -3,6 +3,7 @@
 import { evaluate } from './evaluator.js';
 import { formatResult } from './formatter.js';
 import { highlightAll } from './highlighter.js';
+import { fetchRates } from './currency.js';
 
 const STORAGE_KEY = 'tinysums_v2';
 const DEBOUNCE_MS = 300;
@@ -22,6 +23,9 @@ sum
 
 // Quickly calculate percentages
 32% off $429
+
+// Convert currencies
+100 USD in EUR
 
 // Or compound interest
 $4000.22 at 3% pa
@@ -165,13 +169,17 @@ textarea.addEventListener('scroll', () => {
 // Initialize
 // ============================================================
 
-function init() {
+async function init() {
   initTheme();
   const saved = localStorage.getItem(STORAGE_KEY);
   textarea.value = saved || DEFAULT_INPUT;
   syncVisuals();
   evalAndSave();
   textarea.focus();
+
+  // Fetch currency rates in background, re-evaluate when ready
+  const success = await fetchRates();
+  if (success) evalAndSave();
 }
 
 init();

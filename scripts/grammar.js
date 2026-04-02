@@ -7,6 +7,7 @@ TinySums {
     = Comment
     | CompoundInterest
     | FromNow
+    | TimezoneConversion
     | DateTime
     | Variable
     | PercentQuery
@@ -15,6 +16,8 @@ TinySums {
 
   Calculation
     = Expression inKw aKw? pctWord                   -- inPercent
+    | Expression inKw currencyCode                   -- inCurrency
+    | Expression toKw currencyCode                   -- toCurrency
     | Expression inKw unitSuffix                     -- conversion
     | Expression toKw unitSuffix                     -- toConversion
     | Expression intoKw unitSuffix                   -- intoConversion
@@ -66,6 +69,7 @@ TinySums {
     | Percent
     | TimeInYear
     | Quantity
+    | CurrencyWithCode
     | Currency
     | NumberLit
     | Sum
@@ -120,11 +124,23 @@ TinySums {
     = varName
 
   // --- Currency ---
+  CurrencyWithCode
+    = number kSuffix? currencyCode
+
   Currency
     = currencySymbol number kSuffix?
 
   currencySymbol
     = "$" | "\u20ac" | "\u00a3"
+
+  currencyCode
+    = caseInsensitive<"usd"> ~alnum | caseInsensitive<"eur"> ~alnum | caseInsensitive<"gbp"> ~alnum
+    | caseInsensitive<"aud"> ~alnum | caseInsensitive<"cad"> ~alnum | caseInsensitive<"nzd"> ~alnum
+    | caseInsensitive<"jpy"> ~alnum | caseInsensitive<"chf"> ~alnum | caseInsensitive<"cny"> ~alnum
+    | caseInsensitive<"inr"> ~alnum | caseInsensitive<"sgd"> ~alnum | caseInsensitive<"hkd"> ~alnum
+    | caseInsensitive<"krw"> ~alnum | caseInsensitive<"sek"> ~alnum | caseInsensitive<"nok"> ~alnum
+    | caseInsensitive<"dkk"> ~alnum | caseInsensitive<"brl"> ~alnum | caseInsensitive<"zar"> ~alnum
+    | caseInsensitive<"mxn"> ~alnum | caseInsensitive<"thb"> ~alnum
 
   kSuffix
     = "K" | "k"
@@ -174,6 +190,30 @@ TinySums {
   NumberLit
     = number kSuffix?
 
+  // --- Timezone Conversion ---
+  TimezoneConversion
+    = timeLiteral timezone inKw timezone    -- convert
+    | dateKw inKw timezone                  -- nowInTz
+
+  timeLiteral
+    = number ":" number ampm                -- colonAmPm
+    | number ":" number                     -- colon24
+    | number ampm                           -- bareAmPm
+
+  ampm = "am" ~alnum | "pm" ~alnum
+
+  timezone
+    = "AEST" ~alnum | "AEDT" ~alnum | "ACST" ~alnum | "AWST" ~alnum
+    | "NZST" ~alnum | "NZDT" ~alnum
+    | "JST" ~alnum | "KST" ~alnum | "IST" ~alnum
+    | "CET" ~alnum | "CEST" ~alnum | "EET" ~alnum | "EEST" ~alnum
+    | "GMT" ~alnum | "UTC" ~alnum | "BST" ~alnum
+    | "EST" ~alnum | "EDT" ~alnum
+    | "CST" ~alnum | "CDT" ~alnum
+    | "MST" ~alnum | "MDT" ~alnum
+    | "PST" ~alnum | "PDT" ~alnum
+    | "AKST" ~alnum | "AKDT" ~alnum | "HST" ~alnum
+
   // --- Date/Time ---
   DateTime
     = dateKw
@@ -201,6 +241,7 @@ TinySums {
     = ("sum" | "total" | "now" | "today"
       | "prev" | "previous" | "avg" | "average"
       | "is" | "x" | "to" | "what") ~alnum
+    | currencyCode
 
   // --- Number primitives ---
   number
@@ -220,6 +261,14 @@ TinySums {
     | caseInsensitive<"m/s"> ~alnum | caseInsensitive<"mps"> ~alnum
     | caseInsensitive<"ft/s"> ~alnum | caseInsensitive<"fps"> ~alnum
     | caseInsensitive<"knots"> ~alnum | caseInsensitive<"knot"> ~alnum
+    | caseInsensitive<"tablespoons"> ~alnum | caseInsensitive<"tablespoon"> ~alnum | caseInsensitive<"tbsp"> ~alnum
+    | caseInsensitive<"teaspoons"> ~alnum | caseInsensitive<"teaspoon"> ~alnum | caseInsensitive<"tsp"> ~alnum
+    | caseInsensitive<"cups"> ~alnum | caseInsensitive<"cup"> ~alnum
+    | caseInsensitive<"fluid oz"> ~alnum | caseInsensitive<"fl oz"> ~alnum | caseInsensitive<"floz"> ~alnum
+    | caseInsensitive<"gallons"> ~alnum | caseInsensitive<"gallon"> ~alnum | caseInsensitive<"gal"> ~alnum
+    | caseInsensitive<"quarts"> ~alnum | caseInsensitive<"quart"> ~alnum | caseInsensitive<"qt"> ~alnum
+    | caseInsensitive<"pints"> ~alnum | caseInsensitive<"pint"> ~alnum | caseInsensitive<"pt"> ~alnum
+    | caseInsensitive<"grams"> ~alnum | caseInsensitive<"gram"> ~alnum
     | caseInsensitive<"kg"> | caseInsensitive<"mg">
     | caseInsensitive<"km"> | caseInsensitive<"cm"> | caseInsensitive<"mm">
     | caseInsensitive<"ml"> | caseInsensitive<"kb"> | caseInsensitive<"mb"> | caseInsensitive<"gb">
@@ -235,7 +284,7 @@ TinySums {
     | caseInsensitive<"hrs"> ~alnum | caseInsensitive<"hr"> ~alnum
     | caseInsensitive<"celsius"> ~alnum | caseInsensitive<"fahrenheit"> ~alnum | caseInsensitive<"kelvin"> ~alnum
     | caseInsensitive<"g"> | caseInsensitive<"l"> | caseInsensitive<"b">
-    | "m" ~alnum
+    | "m" ~alnum | "f" ~alnum | "c" ~alnum
     | "\"" | "'"
 }
 `;

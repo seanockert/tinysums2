@@ -10,11 +10,12 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      scrollbar-gutter: stable;
     }
 
     :root {
       --font-stack: sans-serif;
-      --color-teal: hsl(161, 79%, 29%);
+      --color-green: hsl(96, 50%, 40%);
       --color-text: hsl(0, 0%, 10%);
       --color-muted: hsl(0, 0%, 60%);
       --color-border: hsl(0, 0%, 90%);
@@ -24,24 +25,36 @@
       --color-hl-operator: hsl(0, 0%, 53%);
       --color-hl-keyword:hsl(202, 80%, 48%);
       --color-hl-variable: hsl(42, 86%, 51%);
-      --color-result-hover-bg: var(--color-teal);
-      --color-result-active-bg: hsl(160, 80%, 23%);
+      --color-result-hover-bg: var(--color-green);
+      --color-result-active-bg: hsl(96, 50%, 40%);
       --font-size: 1.1rem;
       --line-height: 1.6;
       --padding: 2rem;
+      --easing-overshoot: linear(
+        0,
+        -0.044 9.4%,
+        -0.264 26.8%,
+        -0.265 34%,
+        -0.011 43%,
+        0.91 55.2%,
+        1.227 63.4%,
+        1.276 67.6%,
+        1.271 72.2%,
+        1.044 90.6%,
+        1
+      );
     }
 
     [data-theme="dark"] {
-      --color-teal: hsl(158, 51%, 56%);
+      --color-green: hsl(96, 40%, 60%);
       --color-text: hsl(240, 23%, 90%);
       --color-muted: hsl(240, 23%, 33%);
       --color-border: hsl(240, 23%, 22%);
       --color-bg: hsl(240, 23%, 12%);
-      --color-hl-comment: hsl(240, 23%, 56%);
+      --color-hl-comment: hsl(240, 15%, 50%);
       --color-hl-number: hsl(257, 85%, 79%);
-      --color-hl-operator: hsl(0, 0%, 60%);
-      --color-result-hover-bg: hsl(161, 94%, 30%);
-      --color-result-active-bg: hsl(163, 94%, 24%);
+      --color-hl-operator: hsl(240, 43%, 70%);
+      --color-result-active-bg: hsl(96, 50%, 60%);
     }
 
     html {
@@ -67,7 +80,7 @@
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--color-teal);
+      color: var(--color-green);
     }
 
     header h1 em {
@@ -76,10 +89,10 @@
     }
 
     .editor {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
     }
 
-    /* --- Input side --- */
     .input-container {
       position: relative;
       flex: 1 1 100%;
@@ -118,14 +131,30 @@
       pointer-events: none;
       color: var(--color-text);
       overflow: hidden;
+      mask-image: linear-gradient(to right, black 90%, transparent 100%);
     }
 
-    /* --- Output side --- */
+    button {
+      all: unset;
+      line-height: 1;
+      font: inherit;
+      cursor: pointer;
+      transition: transform 0.25s var(--easing-overshoot), color 0.1s ease-out;
+    }
+
+    button:not(:disabled):hover,
+    button:not(:disabled):focus-visible {
+      transform: scale(1.03);
+    }
+
+    button:not(:disabled):active {
+      transform: scale(0.97, 1.03);
+    }
+
     .output-container {
       flex: 1 1 30%;
       border-left: 1px solid var(--color-border);
       padding: var(--padding);
-      padding-left: 1.5rem;
       text-align: right;
     }
 
@@ -138,24 +167,19 @@
     }
 
     .result-value {
-      background: none;
-      border: none;
-      font: inherit;
-      color: var(--color-teal);
-      cursor: pointer;
+      color: var(--color-green);
       padding: 0 0.4rem;
-      border-radius: 4px;
-      transition: background-color 0.15s, color 0.15s;
+      border-radius: 0.5rem;
     }
 
     .result-value:hover {
       background-color: var(--color-result-hover-bg);
-      color: #fff;
+      color: var(--color-bg);
     }
 
     .result-value:active {
       background-color: var(--color-result-active-bg);
-      color: #fff;
+      color: var(--color-bg);
     }
 
     /* --- Syntax highlighting --- */
@@ -202,7 +226,7 @@
     }
 
     .theme-toggle:hover {
-      border-color: var(--color-teal);
+      border-color: var(--color-green);
     }
 
     :not([data-theme="dark"]) .theme-toggle .theme-dark {
@@ -219,25 +243,23 @@
 
     .toast {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
+      bottom: 0;
+      left: 50%;
+      width: max-content;
       text-align: center;
-      font-weight: 600;
-      font-size: 0.85rem;
-      background: var(--color-teal);
-      color: #fff;
-      padding: 0.6rem;
-      transform: translateY(-100%);
-      transition: transform 0.2s ease;
+      background: var(--color-green);
+      color: var(--color-bg);
+      padding: 1rem 1.5rem 2rem 1.5rem;
+      border-radius: 0.5rem;
+      transform: translateX(-50%) translateY(100%);
+      transition: transform 0.2s var(--easing-overshoot);
       z-index: 100;
     }
 
     .toast.visible {
-      transform: translateY(0);
+      transform: translateX(-50%) translateY(1rem);
     }
 
-    /* --- Responsive --- */
     @media (max-width: 480px) {
       :root {
         --font-size: 1rem;
@@ -263,7 +285,7 @@
     <div class="output-container" id="output"></div>
   </main>
 
-  <div class="toast" id="toast">Copied to clipboard</div>
+  <div class="toast" id="toast">Copied!</div>
 
   <script src="https://unpkg.com/ohm-js@17/dist/ohm.min.js"></script>
   <script type="module" src="scripts/app.js"></script>
