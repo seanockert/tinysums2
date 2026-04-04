@@ -24,7 +24,6 @@
       --font-stack: sans-serif;
       --color-green: hsl(96, 50%, 40%);
       --color-text: hsl(0, 0%, 10%);
-      --color-muted: hsl(0, 0%, 60%);
       --color-border: hsl(0, 0%, 90%);
       --color-bg: hsl(209, 72%, 98%);
       --color-hl-comment: hsl(0, 0%, 50%);
@@ -37,6 +36,8 @@
       --font-size: 1.25rem;
       --line-height: 1.6;
       --padding: 2rem;
+      --padding-half: 1rem;
+      --padding-quarter: 0.5rem;
       --border-radius: 0.5rem;
       --easing-overshoot: linear(0,-0.044 9.4%,-0.264 26.8%,-0.265 34%,-0.011 43%,0.91 55.2%,1.227 63.4%,1.276 67.6%,1.271 72.2%,1.044 90.6%,1);
     }
@@ -44,7 +45,6 @@
     [data-theme="dark"] {
       --color-green: hsl(96, 40%, 60%);
       --color-text: hsl(240, 23%, 90%);
-      --color-muted: hsl(240, 23%, 33%);
       --color-border: hsl(240, 23%, 22%);
       --color-bg: hsl(240, 23%, 12%);
       --color-hl-comment: hsl(240, 15%, 50%);
@@ -65,12 +65,15 @@
       max-width: 100ch;
       margin: 0 auto;
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto 1fr auto;
       padding-top: env(safe-area-inset-top);
     }
 
     header {
-      padding: 0.5rem var(--padding);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--padding-quarter) var(--padding) 0 var(--padding);
     }
 
     header h1 {
@@ -85,6 +88,15 @@
     header h1 em {
       font-style: normal;
       font-weight: 400;
+    }
+
+    header div {
+      display: flex;
+      align-items: center;
+    }
+
+    header button {
+      padding: var(--padding-quarter);
     }
 
     .editor {
@@ -137,8 +149,14 @@
       all: unset;
       line-height: 1;
       font: inherit;
+      color: inherit;
       cursor: pointer;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transition: transform 0.25s var(--easing-overshoot), color 0.1s ease-out;
+      -webkit-tap-highlight-color: transparent;
     }
 
     button:not(:disabled):hover,
@@ -176,6 +194,7 @@
     }
 
     .result-value {
+      display: inline;
       color: var(--color-green);
       padding: 0 0.4rem;
       border-radius: var(--border-radius);
@@ -191,37 +210,11 @@
       color: var(--color-bg);
     }
 
-    /* --- Syntax highlighting --- */
     .hl-comment  { color: var(--color-hl-comment); font-style: italic; }
     .hl-number   { color: var(--color-hl-number); }
     .hl-keyword  { color: var(--color-hl-keyword); }
     .hl-operator { color: var(--color-hl-operator); }
     .hl-variable { color: var(--color-hl-variable); }
-
-    /* --- Theme toggle --- */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .theme-toggle {
-      all: unset;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: none;
-      border: 1px solid var(--color-border);
-      aspect-ratio: 1 / 1;
-      border-radius: 6px;
-      cursor: pointer;
-      padding: 0.3rem;
-      font-size: 1rem;
-      line-height: 1;
-      color: var(--color-text);
-      transition: border-color 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
 
     .theme-toggle svg {
       flex-shrink: 0;
@@ -234,10 +227,6 @@
       transform: scale(0.8);
     }
 
-    .theme-toggle:hover {
-      border-color: var(--color-green);
-    }
-
     :not([data-theme="dark"]) .theme-toggle .theme-dark {
       display: none;
     }
@@ -248,6 +237,50 @@
 
     [data-theme="dark"] .theme-toggle .theme-dark {
       display: flex;
+    }
+
+    .sheet-bar {
+      display: flex;
+      gap: var(--padding-quarter);
+      padding: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    }
+
+    .sheet-bar::-webkit-scrollbar { display: none; }
+
+    .sheet-tab {
+      position: relative;
+      flex: 0 0 auto;
+      max-width: 16rem;
+      padding: 0.4rem 1.75rem 0.4rem 0.75rem;
+      font-size: 0.85rem;
+      line-height: 1;
+      color: var(--color-muted);
+      border: 1px solid var(--color-border);
+      border-bottom: none;
+      border-radius: var(--border-radius) var(--border-radius) 0 0;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .sheet-tab:hover {
+      color: var(--color-text);
+    }
+
+    .sheet-tab .delete-sheet {
+      position: absolute;
+      right: 0.25rem;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0 0.25rem;
+      line-height: 1;
+      transition: opacity 0.15s, color 0.15s;
     }
 
     .toast {
@@ -273,6 +306,11 @@
       :root {
         --font-size: 1.125rem;
         --padding: 1rem;
+        --padding-half: 0.5rem;
+      }
+
+      header {
+        padding-right: var(--padding-quarter)
       }
 
       .highlight-layer {
@@ -289,11 +327,11 @@
       }
 
       .result-line:not(:empty) {
-        background: linear-gradient(to right, transparent 0%, var(--color-bg) 0.5rem);
+        background: linear-gradient(to right, transparent 0%, var(--color-bg) var(--padding-half));
       }
 
       .result-line > button {
-        margin: 0 0.5rem;
+        margin: 0 var(--padding-quarter);
       }
     }
   </style>
@@ -301,10 +339,16 @@
 <body>
   <header>
     <h1><svg width="24" height="24" fill="none" viewBox="0 0 196 196"><path fill="currentColor" d="M163.317 139.804a10.2 10.2 0 0 1-8.776 7.692L53.95 158.682a10.2 10.2 0 0 1-10.252-5.576 34 34 0 0 1-2.6-23.368 10.2 10.2 0 0 1 8.777-7.692l100.591-11.187a10.2 10.2 0 0 1 10.252 5.576 34 34 0 0 1 2.599 23.369M155.169 66.53a10.2 10.2 0 0 1-8.777 7.692L45.802 85.41a10.2 10.2 0 0 1-10.253-5.576 34 34 0 0 1-2.599-23.369 10.2 10.2 0 0 1 8.777-7.692l100.591-11.187a10.2 10.2 0 0 1 10.252 5.576 34 34 0 0 1 2.599 23.369"/></svg><em>Tiny</em>Sums</h1>
-    <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
-      <svg fill="none" class="theme-light" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0"/></svg>
-      <svg fill="none" class="theme-dark" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.7 9.7 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6c0-1.33.266-2.597.748-3.752A9.75 9.75 0 0 0 3 11.25 9.75 9.75 0 0 0 12.75 21a9.75 9.75 0 0 0 9.002-5.998"/></svg>
-    </button>
+    
+    <div>
+      <button class="add-sheet" id="addSheet" title="New sheet" aria-label="New sheet">
+        <svg fill="none" stroke="currentColor" stroke-width="2" height="16" width="16" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      </button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <svg fill="none" class="theme-light" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0"/></svg>
+        <svg fill="none" class="theme-dark" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.7 9.7 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6c0-1.33.266-2.597.748-3.752A9.75 9.75 0 0 0 3 11.25 9.75 9.75 0 0 0 12.75 21a9.75 9.75 0 0 0 9.002-5.998"/></svg>
+      </button>
+    </div>
   </header>
 
   <main class="editor">
@@ -314,6 +358,8 @@
     </div>
     <div class="output-container" id="output"></div>
   </main>
+
+  <nav class="sheet-bar" id="sheetBar"></nav>
 
   <div class="toast" id="toast">Copied!</div>
 

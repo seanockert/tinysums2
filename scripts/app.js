@@ -5,7 +5,8 @@ import { formatResult } from './formatter.js';
 import { highlightAll } from './highlighter.js';
 import { fetchRates } from './currency.js';
 
-const STORAGE_KEY = 'tinysums_v2';
+const SHEETS_KEY = 'tinysums';
+const ACTIVE_KEY = 'tinysums_active';
 const DEBOUNCE_MS = 300;
 
 const DEFAULT_INPUT = `// Define values to use below
@@ -22,7 +23,7 @@ sum
 20kg plus 1900g
 
 // Convert units
-5km in miles 
+5km in miles
 1.5tbsp in grams
 2 cups in ml
 1 gallon in l
@@ -55,6 +56,8 @@ highlightLayer.appendChild(highlightInner);
 const outputContainer = document.getElementById('output');
 const toast = document.getElementById('toast');
 const themeToggle = document.getElementById('themeToggle');
+const addSheetBtn = document.getElementById('addSheet');
+const sheetBar = document.getElementById('sheetBar');
 const MOBILE_BP = 640;
 
 // ============================================================
@@ -68,6 +71,8 @@ const state = {
   isMobile: window.innerWidth <= MOBILE_BP,
   toastTimer: null,
   activeResultLine: null,
+  sheets: [],
+  activeSheetId: null,
 };
 
 const metrics = {
@@ -81,10 +86,72 @@ const measureCtx = document.createElement('canvas').getContext('2d');
 const HAS_FIELD_SIZING = CSS.supports('field-sizing', 'content');
 
 // ============================================================
+// Sheets persistence
+// ============================================================
+
+function nextId() {
+  const used = state.sheets.map(s => s.id);
+  let id = 1;
+  while (used.includes(id)) id++;
+  return id;
+}
+
+function loadSheets() {
+  const raw = localStorage.getItem(SHEETS_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      // Migrate string IDs to simple numbers
+      let needsMigration = parsed.some(s => typeof s.id !== 'number');
+      if (needsMigration) {
+        parsed.forEach((s, i) => { s.id = i + 1; });
+      }
+      state.sheets = parsed;
+      // Prefer hash, then saved active, then first sheet
+      const hashId = parseInt(location.hash.slice(1), 10);
+      const savedId = parseInt(localStorage.getItem(ACTIVE_KEY), 10);
+      state.activeSheetId =
+        (hashId && state.sheets.find(s => s.id === hashId) ? hashId : null) ||
+        (savedId && state.sheets.find(s => s.id === savedId) ? savedId : null) ||
+        state.sheets[0]?.id;
+      if (needsMigration) saveSheets();
+      return;
+    } catch {}
+  }
+
+  const sheet = { id: 1, content: DEFAULT_INPUT, lastEdited: Date.now() };
+  state.sheets = [sheet];
+  state.activeSheetId = sheet.id;
+  saveSheets();
+}
+
+function saveSheets() {
+  localStorage.setItem(SHEETS_KEY, JSON.stringify(state.sheets));
+  localStorage.setItem(ACTIVE_KEY, state.activeSheetId);
+  syncHash();
+}
+
+function syncHash() {
+  const target = '#' + state.activeSheetId;
+  if (location.hash !== target) {
+    history.replaceState(null, '', target);
+  }
+}
+
+function getActiveSheet() {
+  return state.sheets.find(s => s.id === state.activeSheetId);
+}
+
+function sortedInactiveSheets() {
+  return state.sheets
+    .filter(s => s.id !== state.activeSheetId)
+    .sort((a, b) => b.lastEdited - a.lastEdited);
+}
+
+// ============================================================
 // Core update loop
 // ============================================================
 
-// Instant visual feedback — batched to one update per frame
 function syncVisuals() {
   if (state.rafPending) return;
   state.rafPending = true;
@@ -95,17 +162,27 @@ function syncVisuals() {
   });
 }
 
-// Expensive work — parsing + evaluation, debounced
-function evalAndSave() {
+function evalAndRender() {
   const input = textarea.value;
   const results = evaluate(input);
   renderOutput(results);
   updateMobilePadding();
-  localStorage.setItem(STORAGE_KEY, input);
 }
 
-// Set textarea padding-right to exactly the amount needed so no input text
-// is hidden behind a result line. Only applies on mobile.
+function saveActiveSheet() {
+  const sheet = getActiveSheet();
+  if (!sheet) return;
+  sheet.content = textarea.value;
+  sheet.lastEdited = Date.now();
+  saveSheets();
+}
+
+function evalAndSave() {
+  evalAndRender();
+  saveActiveSheet();
+  renderSheetBar();
+}
+
 function updateMobilePadding() {
   if (!state.isMobile) {
     textarea.style.paddingRight = '';
@@ -140,13 +217,11 @@ function renderOutput(results) {
     const btn = div.firstChild;
     if (formatted) {
       if (btn && btn.tagName === 'BUTTON') {
-        // Reuse existing button
         if (btn.textContent !== formatted) {
           btn.textContent = formatted;
           btn.onclick = () => copyToClipboard(formatted);
         }
       } else {
-        // Create new button
         div.innerHTML = '';
         const newBtn = document.createElement('button');
         newBtn.className = 'result-value';
@@ -160,7 +235,6 @@ function renderOutput(results) {
     }
   }
 
-  // Remove excess rows
   while (existing.length > results.length) {
     outputContainer.removeChild(outputContainer.lastChild);
   }
@@ -174,6 +248,104 @@ function autoResize() {
 }
 
 // ============================================================
+// Sheet bar
+// ============================================================
+
+function sheetPreview(sheet) {
+  const firstLine = (sheet.content || '').split('\n').find(l => l.trim()) || 'Empty sheet';
+  return firstLine.slice(0, 50);
+}
+
+function renderSheetBar() {
+  const inactive = sortedInactiveSheets();
+  const existing = sheetBar.children;
+
+  for (let i = 0; i < inactive.length; i++) {
+    const sheet = inactive[i];
+    let tab = existing[i];
+    if (!tab) {
+      tab = document.createElement('div');
+      tab.className = 'sheet-tab';
+      sheetBar.appendChild(tab);
+    }
+    const label = sheetPreview(sheet);
+    // Only rebuild inner content if sheet changed
+    if (tab.dataset.id !== sheet.id || tab.dataset.label !== label) {
+      tab.dataset.id = sheet.id;
+      tab.dataset.label = label;
+      tab.innerHTML = '';
+      tab.appendChild(document.createTextNode(label));
+      const del = document.createElement('button');
+      del.className = 'delete-sheet';
+      del.innerHTML = '<svg fill="none" stroke="currentColor" stroke-width="1.5" height="16" width="16" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>';
+      del.title = 'Delete sheet';
+      del.onclick = (e) => { e.stopPropagation(); deleteSheet(sheet.id); };
+      tab.appendChild(del);
+    }
+    tab.onclick = () => switchToSheet(sheet.id);
+  }
+
+  while (existing.length > inactive.length) {
+    sheetBar.removeChild(sheetBar.lastChild);
+  }
+}
+
+function switchToSheet(id) {
+  if (id === state.activeSheetId) return;
+  // Save current content first
+  saveActiveSheet();
+
+  state.activeSheetId = id;
+  const sheet = getActiveSheet();
+  textarea.value = sheet.content;
+  syncVisuals();
+  evalAndRender();
+  // Push to history so back/forward navigates between sheets
+  const target = '#' + id;
+  if (location.hash !== target) {
+    history.pushState(null, '', target);
+  }
+  localStorage.setItem(ACTIVE_KEY, state.activeSheetId);
+  renderSheetBar();
+  textarea.focus();
+}
+
+function addSheet() {
+  saveActiveSheet();
+  const sheet = { id: nextId(), content: '', lastEdited: Date.now() };
+  state.sheets.push(sheet);
+  state.activeSheetId = sheet.id;
+  textarea.value = '';
+  syncVisuals();
+  evalAndRender();
+  saveSheets();
+  renderSheetBar();
+  textarea.focus();
+}
+
+function deleteSheet(id) {
+  if (state.sheets.length <= 1) return;
+  if (!confirm('Delete this sheet?')) return;
+
+  const idx = state.sheets.findIndex(s => s.id === id);
+  state.sheets.splice(idx, 1);
+
+  // If we deleted the active sheet, switch to the most recent one
+  if (id === state.activeSheetId) {
+    const sorted = [...state.sheets].sort((a, b) => b.lastEdited - a.lastEdited);
+    state.activeSheetId = sorted[0].id;
+    const sheet = getActiveSheet();
+    textarea.value = sheet.content;
+    syncVisuals();
+    evalAndRender();
+  }
+
+  saveSheets();
+  renderSheetBar();
+  textarea.focus();
+}
+
+// ============================================================
 // Clipboard
 // ============================================================
 
@@ -182,7 +354,6 @@ async function copyToClipboard(text) {
     await navigator.clipboard.writeText(text);
     showToast();
   } catch (e) {
-    // Fallback for older browsers
     const tmp = document.createElement('textarea');
     tmp.value = text;
     document.body.appendChild(tmp);
@@ -229,21 +400,16 @@ themeToggle.addEventListener('click', () => {
 // ============================================================
 
 textarea.addEventListener('input', () => {
-  // Highlighting + resize: immediate so text is never invisible
   syncVisuals();
-  // Parsing + results: debounced since it's heavier
   clearTimeout(state.debounceTimer);
   state.debounceTimer = setTimeout(evalAndSave, DEBOUNCE_MS);
 });
 
-// Sync scroll between textarea and highlight layer
 textarea.addEventListener('scroll', () => {
   if (state.scrollRafPending) return;
   state.scrollRafPending = true;
   requestAnimationFrame(() => {
     if (state.isMobile) {
-      // overflow:visible on mobile means scrollLeft has no effect —
-      // translate the inner wrapper instead
       highlightInner.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
     } else {
       highlightLayer.scrollTop = textarea.scrollTop;
@@ -252,8 +418,6 @@ textarea.addEventListener('scroll', () => {
     state.scrollRafPending = false;
   });
 });
-
-// Highlight corresponding output line on hover
 
 function cacheTextareaMetrics() {
   const style = getComputedStyle(textarea);
@@ -279,17 +443,28 @@ textarea.addEventListener('mouseleave', () => {
   }
 });
 
+addSheetBtn.addEventListener('click', addSheet);
+
+window.addEventListener('hashchange', () => {
+  const hashId = parseInt(location.hash.slice(1), 10);
+  if (hashId && hashId !== state.activeSheetId && state.sheets.find(s => s.id === hashId)) {
+    switchToSheet(hashId);
+  }
+});
+
 // ============================================================
 // Initialize
 // ============================================================
 
 async function init() {
   initTheme();
-  const saved = localStorage.getItem(STORAGE_KEY);
-  textarea.value = saved || DEFAULT_INPUT;
+  loadSheets();
+  const sheet = getActiveSheet();
+  textarea.value = sheet.content;
   syncVisuals();
   cacheTextareaMetrics();
-  evalAndSave();
+  evalAndRender();
+  renderSheetBar();
   window.addEventListener('resize', () => {
     state.isMobile = window.innerWidth <= MOBILE_BP;
     if (!state.isMobile) highlightInner.style.transform = '';
@@ -300,7 +475,7 @@ async function init() {
 
   // Fetch currency rates in background, re-evaluate when ready
   const success = await fetchRates();
-  if (success) evalAndSave();
+  if (success) evalAndRender();
 }
 
 init();
