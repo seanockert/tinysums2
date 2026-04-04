@@ -47,14 +47,29 @@ $100K          // $100,000
 
 ## Currency
 
-Supports `$`, `€`, and `£` prefixes.
+Supports `$`, `€`, and `£` symbol prefixes, plus currency codes.
 
 ```
 $100 + $50
 €200 * 3
 £500 - 10%
 $50K + $25K
+100 USD + 50 EUR
+1000 JPY
 ```
+
+### Currency conversion
+
+Convert between 20 supported currencies using live exchange rates.
+
+```
+50 USD in EUR
+$100 to GBP
+1000 JPY in AUD
+€500 as CAD
+```
+
+**Supported currencies:** USD, EUR, GBP, AUD, CAD, NZD, JPY, CHF, CNY, INR, SGD, HKD, KRW, SEK, NOK, DKK, BRL, ZAR, MXN, THB
 
 ## Percentages
 
@@ -114,15 +129,24 @@ Convert between units with `in`, `to`, `into`, or `as`.
 
 ### Supported units
 
-| Category    | Units                                                  |
-| ----------- | ------------------------------------------------------ |
-| Length      | mm, cm, m, km, inch ("), feet/ft ('), yard/yd, mile/mi |
-| Mass        | mg, g, kg                                              |
-| Volume      | ml, l                                                  |
-| Data        | b, kb, mb, gb                                          |
-| Time        | sec, min, hr, day, week                                |
-| Speed       | kph, mph, mps, fps, knot                               |
-| Temperature | celsius/c, fahrenheit/f, kelvin/k                      |
+| Category    | Units                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| Length      | mm, cm, m, km, inch/inches ("), feet/ft ('), yard/yd, mile/mi   |
+| Mass        | mg, g/grams, kg                                                  |
+| Volume      | tsp, tbsp, floz, cup, pint/pt, quart/qt, l, gallon/gal, ml     |
+| Data        | b, kb, mb, gb                                                    |
+| Time        | sec/secs, min/mins, hr/hrs, day/days, week/weeks                 |
+| Speed       | kph (km/h, kmh, kmph), mph, mps (m/s), fps (ft/s), knot/knots  |
+| Temperature | celsius/c, fahrenheit/f, kelvin/k                                |
+
+Volume and mass units can be cross-converted using water density (1 ml = 1 g):
+
+```
+2 cups in ml
+1 gallon in l
+1.5tbsp in grams
+100g in ml
+```
 
 ### Fractional units
 
@@ -147,6 +171,19 @@ $600 for 10 years at 5% compounding quarterly
 ```
 
 Frequencies: `monthly`, `quarterly`, `annually`, `yearly`, `daily`, `weekly`
+
+## Timezone conversion
+
+Convert times between 30+ timezones.
+
+```
+15:30 GMT in AEST
+now in PST
+3:30pm EST in UTC
+8am GMT in JST
+```
+
+**Supported timezones:** UTC, GMT, BST, CET, CEST, EET, EEST, EST, EDT, CST, CDT, MST, MDT, PST, PDT, AKST, AKDT, HST, AEST, AEDT, ACST, AWST, NZST, NZDT, JST, KST, IST
 
 ## Dates and time
 
