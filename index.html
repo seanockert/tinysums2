@@ -37,6 +37,7 @@
       --font-size: 1.25rem;
       --line-height: 1.6;
       --padding: 2rem;
+      --border-radius: 0.5rem;
       --easing-overshoot: linear(0,-0.044 9.4%,-0.264 26.8%,-0.265 34%,-0.011 43%,0.91 55.2%,1.227 63.4%,1.276 67.6%,1.271 72.2%,1.044 90.6%,1);
     }
 
@@ -65,7 +66,7 @@
       margin: 0 auto;
       display: grid;
       grid-template-rows: auto 1fr;
-      /* overflow: hidden; */
+      padding-top: env(safe-area-inset-top);
     }
 
     header {
@@ -78,7 +79,6 @@
       font-size: 1rem;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
       color: var(--color-green);
     }
 
@@ -90,13 +90,12 @@
     .editor {
       display: grid;
       grid-template-columns: 1fr auto;
-      /* overflow-y: auto; */
     }
 
     .input-container {
       position: relative;
-      flex: 1 1 100%;
       min-width: 0;
+      z-index: 0;
     }
 
     textarea,
@@ -107,7 +106,7 @@
       padding: var(--padding);
       white-space: pre;
       width: 100%;
-      min-height: calc(100dvh - 52px);
+      min-height: calc(100dvh - 3.375rem);
       border: none;
       outline: none;
       resize: none;
@@ -162,6 +161,8 @@
       font-size: var(--font-size);
       line-height: var(--line-height);
       white-space: nowrap;
+      width: max-content;
+      margin-left: auto;
     }
 
     /* Force line height to be the same as the textarea */
@@ -177,7 +178,7 @@
     .result-value {
       color: var(--color-green);
       padding: 0 0.4rem;
-      border-radius: 0.5rem;
+      border-radius: var(--border-radius);
     }
 
     .result-value:hover {
@@ -258,7 +259,7 @@
       background: var(--color-green);
       color: var(--color-bg);
       padding: 1rem 1.5rem 2rem 1.5rem;
-      border-radius: 0.5rem;
+      border-radius: var(--border-radius);
       transform: translateX(-50%) translateY(100%);
       transition: transform 0.2s var(--easing-overshoot);
       z-index: 100;
@@ -272,6 +273,27 @@
       :root {
         --font-size: 1.125rem;
         --padding: 1rem;
+      }
+
+      .highlight-layer {
+        overflow: visible;
+        mask-image: none;
+      }
+
+      .output-container {
+        border: none;
+        padding: var(--padding) 0;
+        position: absolute;
+        right: 0;
+        z-index: 3;
+      }
+
+      .result-line:not(:empty) {
+        background: linear-gradient(to right, transparent 0%, var(--color-bg) 0.5rem);
+      }
+
+      .result-line > button {
+        margin: 0 0.5rem;
       }
     }
   </style>

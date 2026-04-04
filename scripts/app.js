@@ -50,17 +50,34 @@ weeks in 2026
 
 const textarea = document.getElementById('input');
 const highlightLayer = document.getElementById('highlight');
+const highlightInner = document.createElement('div');
+highlightLayer.appendChild(highlightInner);
 const outputContainer = document.getElementById('output');
 const toast = document.getElementById('toast');
 const themeToggle = document.getElementById('themeToggle');
+const MOBILE_BP = 640;
 
 // ============================================================
 // State
 // ============================================================
 
-let debounceTimer = null;
-let rafPending = false;
-let scrollRafPending = false;
+const state = {
+  debounceTimer: null,
+  rafPending: false,
+  scrollRafPending: false,
+  isMobile: window.innerWidth <= MOBILE_BP,
+  toastTimer: null,
+  activeResultLine: null,
+};
+
+const metrics = {
+  paddingTop: 0,
+  paddingLeft: 0,
+  lineHeight: 1,
+  measureFont: '',
+};
+
+const measureCtx = document.createElement('canvas').getContext('2d');
 const HAS_FIELD_SIZING = CSS.supports('field-sizing', 'content');
 
 // ============================================================
@@ -69,12 +86,12 @@ const HAS_FIELD_SIZING = CSS.supports('field-sizing', 'content');
 
 // Instant visual feedback — batched to one update per frame
 function syncVisuals() {
-  if (rafPending) return;
-  rafPending = true;
+  if (state.rafPending) return;
+  state.rafPending = true;
   requestAnimationFrame(() => {
-    highlightLayer.innerHTML = highlightAll(textarea.value);
+    highlightInner.innerHTML = highlightAll(textarea.value);
     autoResize();
-    rafPending = false;
+    state.rafPending = false;
   });
 }
 
@@ -83,7 +100,33 @@ function evalAndSave() {
   const input = textarea.value;
   const results = evaluate(input);
   renderOutput(results);
+  updateMobilePadding();
   localStorage.setItem(STORAGE_KEY, input);
+}
+
+// Set textarea padding-right to exactly the amount needed so no input text
+// is hidden behind a result line. Only applies on mobile.
+function updateMobilePadding() {
+  if (!state.isMobile) {
+    textarea.style.paddingRight = '';
+    return;
+  }
+
+  if (!metrics.measureFont) {
+    const style = getComputedStyle(textarea);
+    metrics.measureFont = `${style.fontSize} ${style.fontFamily}`;
+  }
+  measureCtx.font = metrics.measureFont;
+
+  const textareaWidth = textarea.clientWidth;
+  const maxOverlap = textarea.value.split('\n').reduce((max, line, i) => {
+    const resultEl = outputContainer.children[i];
+    if (!resultEl?.firstChild) return max;
+    const overlap = measureCtx.measureText(line).width + metrics.paddingLeft + resultEl.offsetWidth - textareaWidth;
+    return overlap > max ? overlap : max;
+  }, 0);
+
+  textarea.style.paddingRight = maxOverlap > 0 ? (maxOverlap + 16) + 'px' : '';
 }
 
 function renderOutput(results) {
@@ -91,14 +134,9 @@ function renderOutput(results) {
 
   for (let i = 0; i < results.length; i++) {
     const formatted = formatResult(results[i]);
-    let div = existing[i];
-
-    if (!div) {
-      div = document.createElement('div');
-      div.className = 'result-line';
-      outputContainer.appendChild(div);
-    }
-
+    const div = existing[i] || outputContainer.appendChild(
+      Object.assign(document.createElement('div'), { className: 'result-line' })
+    );
     const btn = div.firstChild;
     if (formatted) {
       if (btn && btn.tagName === 'BUTTON') {
@@ -139,8 +177,6 @@ function autoResize() {
 // Clipboard
 // ============================================================
 
-let toastTimer = null;
-
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -159,8 +195,8 @@ async function copyToClipboard(text) {
 
 function showToast() {
   toast.classList.add('visible');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('visible'), 1200);
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => toast.classList.remove('visible'), 1200);
 }
 
 // ============================================================
@@ -196,45 +232,50 @@ textarea.addEventListener('input', () => {
   // Highlighting + resize: immediate so text is never invisible
   syncVisuals();
   // Parsing + results: debounced since it's heavier
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(evalAndSave, DEBOUNCE_MS);
+  clearTimeout(state.debounceTimer);
+  state.debounceTimer = setTimeout(evalAndSave, DEBOUNCE_MS);
 });
 
 // Sync scroll between textarea and highlight layer
 textarea.addEventListener('scroll', () => {
-  if (scrollRafPending) return;
-  scrollRafPending = true;
+  if (state.scrollRafPending) return;
+  state.scrollRafPending = true;
   requestAnimationFrame(() => {
-    highlightLayer.scrollTop = textarea.scrollTop;
-    highlightLayer.scrollLeft = textarea.scrollLeft;
-    scrollRafPending = false;
+    if (state.isMobile) {
+      // overflow:visible on mobile means scrollLeft has no effect —
+      // translate the inner wrapper instead
+      highlightInner.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
+    } else {
+      highlightLayer.scrollTop = textarea.scrollTop;
+      highlightLayer.scrollLeft = textarea.scrollLeft;
+    }
+    state.scrollRafPending = false;
   });
 });
 
 // Highlight corresponding output line on hover
-let activeResultLine = null;
-let cachedPaddingTop = 0;
-let cachedLineHeight = 1;
 
 function cacheTextareaMetrics() {
   const style = getComputedStyle(textarea);
-  cachedPaddingTop = parseFloat(style.paddingTop);
-  cachedLineHeight = parseFloat(style.lineHeight);
+  metrics.paddingTop = parseFloat(style.paddingTop);
+  metrics.paddingLeft = parseFloat(style.paddingLeft);
+  metrics.lineHeight = parseFloat(style.lineHeight);
+  metrics.measureFont = `${style.fontSize} ${style.fontFamily}`;
 }
 
 textarea.addEventListener('mousemove', (e) => {
-  const y = e.clientY - textarea.getBoundingClientRect().top - cachedPaddingTop + textarea.scrollTop;
-  const resultLine = outputContainer.children[Math.floor(y / cachedLineHeight)] || null;
-  if (resultLine === activeResultLine) return;
-  if (activeResultLine) activeResultLine.classList.remove('active');
+  const y = e.clientY - textarea.getBoundingClientRect().top - metrics.paddingTop + textarea.scrollTop;
+  const resultLine = outputContainer.children[Math.floor(y / metrics.lineHeight)] || null;
+  if (resultLine === state.activeResultLine) return;
+  if (state.activeResultLine) state.activeResultLine.classList.remove('active');
   if (resultLine) resultLine.classList.add('active');
-  activeResultLine = resultLine;
+  state.activeResultLine = resultLine;
 });
 
 textarea.addEventListener('mouseleave', () => {
-  if (activeResultLine) {
-    activeResultLine.classList.remove('active');
-    activeResultLine = null;
+  if (state.activeResultLine) {
+    state.activeResultLine.classList.remove('active');
+    state.activeResultLine = null;
   }
 });
 
@@ -247,9 +288,14 @@ async function init() {
   const saved = localStorage.getItem(STORAGE_KEY);
   textarea.value = saved || DEFAULT_INPUT;
   syncVisuals();
-  evalAndSave();
   cacheTextareaMetrics();
-  window.addEventListener('resize', cacheTextareaMetrics);
+  evalAndSave();
+  window.addEventListener('resize', () => {
+    state.isMobile = window.innerWidth <= MOBILE_BP;
+    if (!state.isMobile) highlightInner.style.transform = '';
+    cacheTextareaMetrics();
+    updateMobilePadding();
+  });
   textarea.focus();
 
   // Fetch currency rates in background, re-evaluate when ready
