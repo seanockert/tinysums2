@@ -6,6 +6,9 @@ No AI. Works offline. Share via URL.
 
 [Demo here](https://sumthing.seanockert.com)
 
+<img width="1200" height="640" alt="cover" src="https://github.com/user-attachments/assets/83fb304d-3033-4255-a11d-02f96dc5156b" />
+
+
 ### Example
 
 ```
