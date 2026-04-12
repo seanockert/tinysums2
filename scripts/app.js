@@ -1,5 +1,3 @@
-// UI glue: textarea, results, localStorage, copy
-
 import { evaluate, getGrammarAndSemantics } from './evaluator.js';
 import { formatResult } from './formatter.js';
 import { highlightAll } from './highlighter.js';
@@ -46,8 +44,6 @@ today
 weeks in 2026
 15:30 GMT in AEST`;
 
-// DOM references
-
 const textarea = document.getElementById('input');
 const highlightLayer = document.getElementById('highlight');
 const highlightInner = document.createElement('div');
@@ -60,9 +56,10 @@ const sheetBar = document.getElementById('sheetBar');
 const introDialog = document.getElementById('intro');
 const helpDialog = document.getElementById('help');
 const helpBtn = document.getElementById('helpBtn');
+const typingDemo = document.getElementById('typingDemo');
+const heading = document.querySelector('h1');
 const MOBILE_BP = 640;
 
-// URL encoding (URL-safe base64, Unicode-safe)
 function encodeContent(text) {
   const bytes = new TextEncoder().encode(text);
   const binary = Array.from(bytes, b => String.fromCharCode(b)).join('');
@@ -76,7 +73,6 @@ function decodeContent(encoded) {
   return new TextDecoder().decode(bytes);
 }
 
-// State
 const state = {
   debounceTimer: null,
   rafPending: false,
@@ -98,7 +94,8 @@ const metrics = {
 const measureCtx = document.createElement('canvas').getContext('2d');
 const HAS_FIELD_SIZING = CSS.supports('field-sizing', 'content');
 
-// Sheets persistence
+const lockBody = (lock) => document.body.style.overflow = lock ? 'hidden' : '';
+
 function nextId() {
   const used = state.sheets.map(s => s.id);
   let id = 1;
@@ -107,7 +104,6 @@ function nextId() {
 }
 
 function loadSheets() {
-  // Load existing sheets from localStorage
   const raw = localStorage.getItem(SHEETS_KEY);
   if (raw) {
     try {
@@ -121,7 +117,6 @@ function loadSheets() {
     }
   }
 
-  // Check for base64-encoded content in the hash
   const hash = location.hash.slice(1);
   if (hash) {
     try {
@@ -139,13 +134,11 @@ function loadSheets() {
     } catch {}
   }
 
-  // No hash — use first sheet
   if (state.sheets.length) {
     state.activeSheetId = state.sheets[0].id;
     return;
   }
 
-  // No sheets at all — create default
   const sheet = { id: 1, content: DEFAULT_INPUT, lastEdited: Date.now() };
   state.sheets = [sheet];
   state.activeSheetId = sheet.id;
@@ -176,7 +169,6 @@ function sortedInactiveSheets() {
     .sort((a, b) => b.lastEdited - a.lastEdited);
 }
 
-// Core update loop
 function syncVisuals() {
   if (state.rafPending) return;
   state.rafPending = true;
@@ -283,7 +275,6 @@ function autoResize() {
   }
 }
 
-// Sheet bar
 function sheetPreview(sheet) {
   const firstLine = (sheet.content || '').split('\n').find(l => l.trim()) || 'Empty sheet';
   const firstLineWithoutComment = firstLine.replace(/^\/\//, '');
@@ -303,7 +294,6 @@ function renderSheetBar() {
       sheetBar.appendChild(tab);
     }
     const label = sheetPreview(sheet);
-    // Only rebuild inner content if sheet changed
     if (tab.dataset.id !== sheet.id || tab.dataset.label !== label) {
       tab.dataset.id = sheet.id;
       tab.dataset.label = label;
@@ -326,7 +316,6 @@ function renderSheetBar() {
 
 function switchToSheet(id) {
   if (id === state.activeSheetId) return;
-  // Save current content first
   saveActiveSheet();
 
   state.activeSheetId = id;
@@ -364,7 +353,6 @@ function deleteSheet(id) {
   
   state.sheets.splice(idx, 1);
 
-  // If we deleted the active sheet, switch to the most recent one
   if (id === state.activeSheetId) {
     const sorted = [...state.sheets].sort((a, b) => b.lastEdited - a.lastEdited);
     state.activeSheetId = sorted[0].id;
@@ -379,7 +367,6 @@ function deleteSheet(id) {
   textarea.focus();
 }
 
-// Clipboard
 function getSelectedLineRange() {
   const text = textarea.value;
   let { selectionStart, selectionEnd } = textarea;
@@ -393,18 +380,8 @@ function getSelectedLineRange() {
 }
 
 async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast();
-  } catch (e) {
-    const tmp = document.createElement('textarea');
-    tmp.value = text;
-    document.body.appendChild(tmp);
-    tmp.select();
-    document.execCommand('copy');
-    document.body.removeChild(tmp);
-    showToast();
-  }
+  await navigator.clipboard.writeText(text);
+  showToast();
 }
 
 function showToast() {
@@ -413,7 +390,6 @@ function showToast() {
   state.toastTimer = setTimeout(() => toast.classList.remove('visible'), 1200);
 }
 
-// Theme
 const THEME_KEY = 'sumthing_theme';
 
 function applyTheme(theme) {
@@ -441,7 +417,6 @@ themeToggle.addEventListener('click', () => {
   document.startViewTransition(() => applyTheme(next));
 });
 
-// Event listeners
 textarea.addEventListener('copy', (e) => {
   const results = evaluate(textarea.value);
   const lines = textarea.value.split('\n');
@@ -533,23 +508,22 @@ function showIntro() {
   requestAnimationFrame(() => {
     introDialog.showModal();
     introDialog.classList.add('is-entering');
-    document.body.style.overflow = 'hidden';
-    stopTypingDemo = initTypingDemo(document.getElementById('typingDemo'));
+    lockBody(true);
+    stopTypingDemo = initTypingDemo(typingDemo);
   });
 }
 
-document.querySelector('h1').addEventListener('click', showIntro);
+heading.addEventListener('click', showIntro);
 
-helpBtn.addEventListener('click', () => { helpDialog.showModal(); document.body.style.overflow = 'hidden'; });
-helpDialog.addEventListener('close', () => { document.body.style.overflow = ''; });
+helpBtn.addEventListener('click', () => { helpDialog.showModal(); lockBody(true); });
+helpDialog.addEventListener('close', () => { lockBody(false); });
 introDialog.addEventListener('close', () => {
   localStorage.setItem('sumthing_intro', '1');
-  document.body.style.overflow = '';
+  lockBody(false);
   introDialog.classList.remove('is-entering');
   if (stopTypingDemo) stopTypingDemo();
 });
 
-// Monster
 const eyes = document.querySelectorAll('.m-eye');
 const pupils = document.querySelectorAll('.m-eye-pupil');
 
@@ -590,7 +564,6 @@ if (eyes.length && pupils.length) {
   });
 }
 
-// Init
 async function init() {
   initTheme();
   loadSheets();
@@ -608,12 +581,10 @@ async function init() {
   });
   textarea.focus();
 
-  // Show intro dialog on first visit
   if (!localStorage.getItem('sumthing_intro')) {
     showIntro();
   }
 
-  // Fetch currency rates in background, re-evaluate when ready
   const success = await fetchRates();
   if (success) evalAndRender();
 }

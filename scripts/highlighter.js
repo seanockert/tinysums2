@@ -1,4 +1,3 @@
-// Syntax highlighter — regex-based tokenizer
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -6,7 +5,6 @@ function escapeHtml(str) {
 // Shared unit list (order matters: longer alternatives first to avoid partial matches)
 const UNITS = 'kmph|km\\/hr|km\\/h|kph|kmh|k\\/hr|mph|m\\/s|mps|ft\\/s|fps|knots?|tablespoons?|tbsp|teaspoons?|tsp|cups?|fluid oz|fl oz|floz|gallons?|gal|quarts?|qt|pints?|pt|inches|inch|feet|foot|ft|yards?|yd|miles?|mi|kg|mg|km|cm|mm|ml|kb|mb|gb|weeks?|hours?|days?|mins?|secs?|hrs?|celsius|fahrenheit|kelvin|grams?|g|l|m|b|f|c';
 
-// Pre-built regexes
 const RE_FRAC_UNIT = new RegExp(`(\\d+\\/\\d+)(${UNITS})\\b`, 'gi');
 const RE_FRAC_SYMBOL = /(\d+\/\d+)(&quot;|')/g;
 const RE_NUM_UNIT = new RegExp(`(?<!["$€£\\d])(\\d+(?:,\\d+)*(?:\\.\\d+)?)(${UNITS})\\b`, 'gi');

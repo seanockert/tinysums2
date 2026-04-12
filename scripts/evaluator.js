@@ -1,8 +1,6 @@
-// Evaluator — unit system, state management, ohm semantic actions
 import { grammarSource } from './grammar.js';
 import { convertCurrency, getDefaultCurrencyCode, SYMBOL_TO_CODE, CODE_TO_SYMBOL } from './currency.js';
 
-// Unit System
 const UNIT_GROUPS = {
   mass:   { mg: 0.001, g: 1, kg: 1000 },
   volume: { ml: 1, tsp: 5, tbsp: 15, floz: 29.5735, cup: 236.588, pint: 473.176, quart: 946.353, l: 1000, gallon: 3785.41 },
@@ -74,7 +72,7 @@ function fromBase(baseValue, targetUnit) {
   return baseValue / UNIT_GROUPS[group][u];
 }
 
-// Pre-sort unit entries by scale descending (avoids re-sorting on every call)
+// Pre-sorted by scale descending to avoid re-sorting on every call
 const SORTED_UNITS = {};
 for (const [group, units] of Object.entries(UNIT_GROUPS)) {
   SORTED_UNITS[group] = Object.entries(units).sort((a, b) => b[1] - a[1]);
@@ -90,12 +88,10 @@ function bestUnit(baseValue, group) {
       return { value: display, unit };
     }
   }
-  // Fallback: smallest unit
   const smallest = sorted[sorted.length - 1];
   return { value: baseValue / smallest[1], unit: smallest[0] };
 }
 
-// Result helpers
 function result(value, prefix = '', unit = null, unitGroup = null, currencyCode = null) {
   const r = { value, prefix, unit, unitGroup };
   if (currencyCode) r.currencyCode = currencyCode;
@@ -107,18 +103,15 @@ function parseNum(s) {
 }
 
 function mergeUnits(a, b) {
-  // Temperature arithmetic: convert both to base (celsius), operate, keep as celsius
   if (a.unitGroup === 'temperature' || b.unitGroup === 'temperature') {
     if (a.unitGroup === 'temperature' && b.unitGroup === 'temperature') {
       return { unitGroup: 'temperature', aBase: toBase(a.value, a.unit).value, bBase: toBase(b.value, b.unit).value };
     }
     return null;
   }
-  // If both have units in the same group, arithmetic in base units
   if (a.unitGroup && b.unitGroup && a.unitGroup === b.unitGroup) {
     return { unitGroup: a.unitGroup, aBase: toBase(a.value, a.unit).value, bBase: toBase(b.value, b.unit).value };
   }
-  // If only one has units, the result keeps those units
   if (a.unitGroup && !b.unitGroup) {
     return { unitGroup: a.unitGroup, aBase: toBase(a.value, a.unit).value, bBase: b.value * UNIT_GROUPS[a.unitGroup][a.unit] };
   }
@@ -128,46 +121,26 @@ function mergeUnits(a, b) {
   return null;
 }
 
-function addResults(a, b) {
+function combineResults(a, b, subtract = false) {
+  const op = subtract ? (x, y) => x - y : (x, y) => x + y;
   const prefix = a.prefix || b.prefix;
   if (a.currencyCode && b.currencyCode && a.currencyCode !== b.currencyCode) {
     const bConverted = convertCurrency(b.value, b.currencyCode, a.currencyCode);
     if (bConverted !== null) {
-      return result(a.value + bConverted, a.prefix || CODE_TO_SYMBOL[a.currencyCode] || '', null, 'currency', a.currencyCode);
+      return result(op(a.value, bConverted), a.prefix || CODE_TO_SYMBOL[a.currencyCode] || '', null, 'currency', a.currencyCode);
     }
   }
   if (a.currencyCode || b.currencyCode) {
     const code = a.currencyCode || b.currencyCode;
-    return result(a.value + b.value, prefix, null, 'currency', code);
+    return result(op(a.value, b.value), prefix, null, 'currency', code);
   }
   const merged = mergeUnits(a, b);
   if (merged) {
-    const baseVal = merged.aBase + merged.bBase;
+    const baseVal = op(merged.aBase, merged.bBase);
     const best = bestUnit(baseVal, merged.unitGroup);
     return result(best.value, prefix, best.unit, merged.unitGroup);
   }
-  return result(a.value + b.value, prefix);
-}
-
-function subtractResults(a, b) {
-  const prefix = a.prefix || b.prefix;
-  if (a.currencyCode && b.currencyCode && a.currencyCode !== b.currencyCode) {
-    const bConverted = convertCurrency(b.value, b.currencyCode, a.currencyCode);
-    if (bConverted !== null) {
-      return result(a.value - bConverted, a.prefix || CODE_TO_SYMBOL[a.currencyCode] || '', null, 'currency', a.currencyCode);
-    }
-  }
-  if (a.currencyCode || b.currencyCode) {
-    const code = a.currencyCode || b.currencyCode;
-    return result(a.value - b.value, prefix, null, 'currency', code);
-  }
-  const merged = mergeUnits(a, b);
-  if (merged) {
-    const baseVal = merged.aBase - merged.bBase;
-    const best = bestUnit(baseVal, merged.unitGroup);
-    return result(best.value, prefix, best.unit, merged.unitGroup);
-  }
-  return result(a.value - b.value, prefix);
+  return result(op(a.value, b.value), prefix);
 }
 
 function multiplyResults(a, b) {
@@ -175,7 +148,6 @@ function multiplyResults(a, b) {
   const unit = a.unit || b.unit;
   const unitGroup = a.unitGroup || b.unitGroup;
   const code = a.currencyCode || b.currencyCode || null;
-  // Cross-group: speed * time = length (in km), or time * speed
   if ((a.unitGroup === 'speed' && b.unitGroup === 'time') ||
       (a.unitGroup === 'time' && b.unitGroup === 'speed')) {
     const spd = a.unitGroup === 'speed' ? a : b;
@@ -184,7 +156,6 @@ function multiplyResults(a, b) {
     const timeHr = toBase(tm.value, tm.unit).value / 3600;
     return result(speedKph * timeHr, prefix, 'km', 'length');
   }
-  // For multiplication, one side should be unitless
   if (a.unitGroup && b.unitGroup) {
     return result(a.value * b.value, prefix, a.unit, a.unitGroup, a.currencyCode);
   }
@@ -194,7 +165,6 @@ function multiplyResults(a, b) {
 function divideResults(a, b) {
   const prefix = a.prefix || b.prefix;
   if (b.value === 0) return result(0, prefix);
-  // Division with same currency = unitless ratio
   if (a.currencyCode && b.currencyCode) {
     if (a.currencyCode !== b.currencyCode) {
       const bConverted = convertCurrency(b.value, b.currencyCode, a.currencyCode);
@@ -202,18 +172,15 @@ function divideResults(a, b) {
     }
     return result(a.value / b.value, '');
   }
-  // Division with same unit group = unitless ratio
   if (a.unitGroup && b.unitGroup && a.unitGroup === b.unitGroup) {
     const merged = mergeUnits(a, b);
     return result(merged.aBase / merged.bBase, prefix);
   }
-  // Cross-group: length / speed = time (in hours)
   if (a.unitGroup === 'length' && b.unitGroup === 'speed') {
     const lengthKm = toBase(a.value, a.unit).value / 1000000;
     const speedKph = toBase(b.value, b.unit).value;
     return result(lengthKm / speedKph, prefix, 'hr', 'time');
   }
-  // Cross-group: length / time = speed (in kph)
   if (a.unitGroup === 'length' && b.unitGroup === 'time') {
     const lengthKm = toBase(a.value, a.unit).value / 1000000;
     const timeHr = toBase(b.value, b.unit).value / 3600;
@@ -222,7 +189,6 @@ function divideResults(a, b) {
   return result(a.value / b.value, prefix, a.unit, a.unitGroup, a.currencyCode);
 }
 
-// Evaluation State
 export class State {
   constructor() {
     this.variables = new Map();
@@ -271,7 +237,6 @@ export class State {
   }
 }
 
-// Timezone conversion
 const TZ_MAP = {
   UTC:  'UTC',
   GMT:  'Europe/London',
@@ -346,14 +311,12 @@ function buildDateFromTime(hours, minutes, sourceIana) {
   return new Date(naive.getTime() - (srcMs - utcMs));
 }
 
-// Compound interest
 function compound(principal, annualRate, years, frequency) {
   if (!frequency) frequency = 12;
   const r = annualRate / 100;
   return principal * Math.pow(1 + r / frequency, frequency * years);
 }
 
-// Build grammar + semantics
 function convertUnits(val, targetUnitStr) {
   const target = normalizeUnit(targetUnitStr);
   const group = UNIT_TO_GROUP[target];
@@ -367,16 +330,14 @@ function convertUnits(val, targetUnitStr) {
     const converted = fromBase(baseVal, target);
     return result(converted, val.prefix, target, group);
   }
-  // Cross-group: volume ↔ mass using water density (1ml = 1g)
+  // Volume ↔ mass using water density (1ml = 1g)
   if (val.unitGroup === 'volume' && group === 'mass') {
-    const ml = toBase(val.value, val.unit).value; // convert to ml
-    const converted = fromBase(ml, target);        // ml = g, so ml is base grams
-    return result(converted, val.prefix, target, group);
+    const ml = toBase(val.value, val.unit).value;
+    return result(fromBase(ml, target), val.prefix, target, group);
   }
   if (val.unitGroup === 'mass' && group === 'volume') {
-    const g = toBase(val.value, val.unit).value;   // convert to grams
-    const converted = fromBase(g, target);          // g = ml, so g is base ml
-    return result(converted, val.prefix, target, group);
+    const g = toBase(val.value, val.unit).value;
+    return result(fromBase(g, target), val.prefix, target, group);
   }
   return val;
 }
@@ -524,8 +485,7 @@ export function getGrammarAndSemantics() {
         const factor = isSub ? (1 - r.value) : (1 + r.value);
         return result(l.value * factor, l.prefix, l.unit, l.unitGroup, l.currencyCode);
       }
-      if (isSub) return subtractResults(l, r);
-      return addResults(l, r);
+      return combineResults(l, r, isSub);
     },
     Expression(node) { return node.eval(this.args.state); },
 
@@ -775,7 +735,6 @@ export function getGrammarAndSemantics() {
   return { grammar: _grammar, semantics: _semantics };
 }
 
-// Main evaluation function — processes all lines
 export function evaluate(input) {
   const { grammar, semantics } = getGrammarAndSemantics();
   const state = new State();

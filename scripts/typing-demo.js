@@ -1,4 +1,3 @@
-// Typing demo — animates calculations in the intro dialog
 import { highlightLine } from './highlighter.js';
 
 const DEMOS = [

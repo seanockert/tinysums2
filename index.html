@@ -19,7 +19,6 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      scrollbar-gutter: stable;
     }
 
     :root {
@@ -35,8 +34,6 @@
       --color-hl-operator: light-dark(hsl(0, 0%, 40%), hsl(240, 43%, 70%));
       --color-hl-keyword:light-dark(hsl(220, 60%, 50%), hsl(220, 60%, 76%));
       --color-hl-variable: hsl(42, 86%, 51%);
-      --color-result-hover-bg: var(--color-green);
-      --color-result-active-bg: var(--color-green);
       --color-button-fg: light-dark(var(--color-bg), var(--color-text));
       --font-size: 1.25rem;
       --font-size-small: 0.8em;
@@ -158,18 +155,24 @@
     }
 
     textarea,
-    .highlight-layer {
+    .highlight-layer,
+    .result-line {
       font-family: var(--font-stack);
       font-size: var(--font-size);
       line-height: var(--line-height);
-      padding: var(--padding);
       white-space: pre;
+    }
+
+    textarea,
+    .highlight-layer {
+      padding: var(--padding);
       width: 100%;
       border: none;
       outline: none;
       resize: none;
       margin: 0;
       background: transparent;
+      scrollbar-gutter: stable;
     }
 
     textarea {
@@ -199,9 +202,6 @@
     }
 
     .result-line {
-      font-family: var(--font-stack);
-      font-size: var(--font-size);
-      line-height: var(--line-height);
       white-space: nowrap;
       width: max-content;
       margin-left: auto;
@@ -224,13 +224,9 @@
       border-radius: var(--border-radius);
     }
 
-    .result-value:hover {
-      background-color: var(--color-result-hover-bg);
-      color: var(--color-bg);
-    }
-
+    .result-value:hover,
     .result-value:active {
-      background-color: var(--color-result-active-bg);
+      background-color: var(--color-green);
       color: var(--color-bg);
     }
 
@@ -243,6 +239,7 @@
     .sheet-bar {
       overflow-x: auto;
       scrollbar-width: none;
+      scrollbar-gutter: stable;
       -webkit-overflow-scrolling: touch;
       mask-image: linear-gradient(to right, black 90%, transparent 100%);
       white-space: nowrap;
@@ -355,7 +352,7 @@
       }
 
       pre {
-        font-family: var(--font-family);
+        font-family: var(--font-stack);
         white-space: pre;
       }
     }
@@ -383,6 +380,10 @@
         gap: var(--padding-half);
       }
 
+      p {
+        text-wrap: balance;
+      }
+
       button {
         padding: 1.5ch 4ch;
         font-weight: 800;
@@ -391,40 +392,41 @@
         border-radius: var(--border-radius);
         margin: 0 auto;
       }
+    }
 
-      .typing-demo {
-        display: flex;
-        align-items: center;
-        line-height: var(--line-height);
-        white-space: nowrap;
-        width: 100%;
-        max-width: 20ch;
-        margin: 0 auto;
-      }
 
-      .typing-demo-cursor {
-        display: inline-block;
-        width: 1px;
-        height: 1.2em;
-        background: var(--color-text);
-        margin-left: 1px;
-        vertical-align: text-bottom;
-        animation: cursor 1s infinite;
-      }
+    .typing-demo {
+      display: flex;
+      align-items: center;
+      line-height: var(--line-height);
+      white-space: nowrap;
+      width: 100%;
+      max-width: 20ch;
+      margin: 0 auto;
+    }
 
-      .typing-demo-result {
-        margin-left: auto;
-        padding-left: 1ch;
-        color: var(--color-green);
-        opacity: 0;
-        transform: translateY(4px);
-        transition: opacity 0.2s ease-out, transform 0.2s ease-out;
-      }
+    .typing-demo-cursor {
+      display: inline-block;
+      width: 1px;
+      height: 1.2em;
+      background: var(--color-text);
+      margin-left: 1px;
+      vertical-align: text-bottom;
+      animation: cursor 1s infinite;
+    }
 
-      .typing-demo-result.visible {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    .typing-demo-result {
+      margin-left: auto;
+      padding-left: 1ch;
+      color: var(--color-green);
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+    }
+
+    .typing-demo-result.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     button.theme-toggle { 
@@ -619,8 +621,8 @@
             <path fill="#fff" d="M71 47.3c0 14.1-8 25.8-20.7 25.8a26.5 26.5 0 0 1-25.4-25.8c0-14 10.3-25.5 23-25.5s23 11.4 23 25.5"/>
             <path fill="#5e4c90" fill-opacity=".2" d="M62.5 69.4c-28.2 2.3-38.1-19.5-36-31.5-3.2 5-4 16.2 4 26.3 8.2 10 19.8 13.9 32 5.2"/>
             <g class="m-eye-pupil">
-              <ellipse cx="57.3" cy="49.6" fill="#456dbe" rx="6.6" ry="10.3"/>
-              <ellipse cx="55" cy="45.5" rx="3.1" ry="4.9" fill="#fff" transform="rotate(-20 59 35.5)"/>
+               <ellipse cx="52" cy="50" fill="hsl(220,48%,51%)" rx="6.6" ry="10.3"/>
+                <ellipse cx="52.5" cy="48.5" rx="3.1" ry="4.9" fill="#fff"/>
             </g>
           </g>
           <g class="m-highlights" fill="#fff">
@@ -665,8 +667,8 @@
               <g class="m-eye">
                 <path fill="#fff" d="M71 47.3c0 14.1-8 25.8-20.7 25.8a26.5 26.5 0 0 1-25.4-25.8c0-14 10.3-25.5 23-25.5s23 11.4 23 25.5"/>
                 <g class="m-eye-pupil">
-                  <ellipse cx="57.3" cy="49.6" fill="hsl(220,48%,51%)" rx="6.6" ry="10.3"/>
-                  <ellipse cx="55" cy="45.5" rx="3.1" ry="4.9" fill="#fff" transform="rotate(-20 59 35.5)"/>
+                  <ellipse cx="52" cy="50" fill="hsl(220,48%,51%)" rx="6.6" ry="10.3"/>
+                  <ellipse cx="52.5" cy="48.5" rx="3.1" ry="4.9" fill="#fff"/>
                 </g>
               </g>
               <g class="m-highlights" fill="#fff">
@@ -687,8 +689,8 @@
         <span class="typing-demo-result"></span>
       </div>
 
-      <p>Just type. Mix math, conversions, currencies, and notes in plain text.</p>
-      <p>Answers appear as you go!</p>
+      <p>Just type. Mix math, conversions, currencies in plain text.</p>
+      <p>Instant answers.</p>
       <p>No AI. Works offline. Share the link.</p>
 
       <form method="dialog">
@@ -794,6 +796,5 @@
   </svg>
   <script src="scripts/ohm.min.js"></script>
   <script type="module" src="scripts/app.js"></script>
-  <!-- <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js'); }</script> -->
 </body>
 </html>
