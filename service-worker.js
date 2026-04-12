@@ -11,6 +11,7 @@ const urlsToCache = [
   '/scripts/highlighter.js',
   '/scripts/currency.js',
   '/scripts/grammar.js',
+  '/scripts/typing-demo.js',
 ];
 
 self.addEventListener('install', (event) => {

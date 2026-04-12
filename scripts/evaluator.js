@@ -44,9 +44,15 @@ function normalizeUnit(raw) {
     gallons: 'gallon', gal: 'gallon',
     grams: 'g', gram: 'g',
     'km/h': 'kph', 'km/hr': 'kph', 'k/hr': 'kph', kmh: 'kph', kmph: 'kph',
+    'kilometres per hour': 'kph', 'kilometers per hour': 'kph',
+    'kilometre per hour': 'kph', 'kilometer per hour': 'kph',
     'm/s': 'mps',
+    'meters per second': 'mps', 'meter per second': 'mps',
+    'metres per second': 'mps', 'metre per second': 'mps',
+    'miles per hour': 'mph', 'mile per hour': 'mph',
     'ft/s': 'fps',
-    knots: 'knot',
+    'feet per second': 'fps', 'foot per second': 'fps',
+    knots: 'knot', kn: 'knot',
     celsius: 'c', fahrenheit: 'f', kelvin: 'k',
   };
   return aliases[u] || u;

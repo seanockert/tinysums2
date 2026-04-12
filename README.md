@@ -139,7 +139,7 @@ Convert between units with `in`, `to`, `into`, or `as`.
 | Volume      | tsp, tbsp, floz, cup, pint/pt, quart/qt, l, gallon/gal, ml    |
 | Data        | b, kb, mb, gb                                                 |
 | Time        | sec/secs, min/mins, hr/hrs, day/days, week/weeks              |
-| Speed       | kph (km/h, kmh, kmph), mph, mps (m/s), fps (ft/s), knot/knots |
+| Speed       | km/h (kph, kmh, kmph, kilometers per hour), mph (miles per hour), m/s (mps, meters per second), ft/s (fps, feet per second), kn/knot/knots |
 | Temperature | celsius/c, fahrenheit/f, kelvin/k                             |
 
 Volume and mass units can be cross-converted using water density (1 ml = 1 g):
@@ -162,8 +162,8 @@ How many cups in 1500 ml
 ### Cross-unit arithmetic
 
 ```
-60kph * 2hr       // 120 km (speed x time = distance)
-120km / 60kph     // 2 hours (distance / speed = time)
+60 km/h * 2hr     // 120 km (speed x time = distance)
+120km / 60 km/h   // 2 hours (distance / speed = time)
 ```
 
 ## Compound interest

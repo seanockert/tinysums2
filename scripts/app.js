@@ -15,6 +15,7 @@ How many cups in 1500 ml
 1 gallon in l
 68f to c
 64mph in km/h
+10 kn in meters per second
 
 // Add different units
 20kg plus 1900g

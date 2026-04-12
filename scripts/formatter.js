@@ -1,3 +1,5 @@
+// Formatter — converts Result objects to display strings
+const DISPLAY_UNITS = { kph: 'km/h', mps: 'm/s', fps: 'ft/s' };
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -53,8 +55,9 @@ export function formatResult(res) {
 
   // Quantity with units
   if (res.unit) {
-    const sep = (res.unit === '"' || res.unit === "'") ? '' : ' ';
-    return numberFormatter.format(rounded) + sep + res.unit;
+    const display = DISPLAY_UNITS[res.unit] || res.unit;
+    const sep = (display === '"' || display === "'") ? '' : ' ';
+    return numberFormatter.format(rounded) + sep + display;
   }
 
   // Plain number

@@ -243,13 +243,19 @@ Sumthing {
   // Case-insensitive multi-char units use caseInsensitive<>
   // "m" (meters) is lowercase-only to avoid conflict with M multiplier
   unitSuffix
-    = caseInsensitive<"kmph"> ~alnum | caseInsensitive<"km/hr"> ~alnum
+    = caseInsensitive<"kilometres per hour"> ~alnum | caseInsensitive<"kilometers per hour"> ~alnum
+    | caseInsensitive<"kilometre per hour"> ~alnum | caseInsensitive<"kilometer per hour"> ~alnum
+    | caseInsensitive<"meters per second"> ~alnum | caseInsensitive<"meter per second"> ~alnum
+    | caseInsensitive<"metres per second"> ~alnum | caseInsensitive<"metre per second"> ~alnum
+    | caseInsensitive<"miles per hour"> ~alnum | caseInsensitive<"mile per hour"> ~alnum
+    | caseInsensitive<"feet per second"> ~alnum | caseInsensitive<"foot per second"> ~alnum
+    | caseInsensitive<"kmph"> ~alnum | caseInsensitive<"km/hr"> ~alnum
     | caseInsensitive<"km/h"> ~alnum | caseInsensitive<"kph"> ~alnum | caseInsensitive<"kmh"> ~alnum
     | caseInsensitive<"k/hr"> ~alnum
     | caseInsensitive<"mph"> ~alnum
     | caseInsensitive<"m/s"> ~alnum | caseInsensitive<"mps"> ~alnum
     | caseInsensitive<"ft/s"> ~alnum | caseInsensitive<"fps"> ~alnum
-    | caseInsensitive<"knots"> ~alnum | caseInsensitive<"knot"> ~alnum
+    | caseInsensitive<"knots"> ~alnum | caseInsensitive<"knot"> ~alnum | caseInsensitive<"kn"> ~alnum
     | caseInsensitive<"tablespoons"> ~alnum | caseInsensitive<"tablespoon"> ~alnum | caseInsensitive<"tbsp"> ~alnum
     | caseInsensitive<"teaspoons"> ~alnum | caseInsensitive<"teaspoon"> ~alnum | caseInsensitive<"tsp"> ~alnum
     | caseInsensitive<"cups"> ~alnum | caseInsensitive<"cup"> ~alnum
