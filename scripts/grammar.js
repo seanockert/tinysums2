@@ -1,9 +1,25 @@
+import { UNIT_SPELLINGS, LOWERCASE_ONLY, TZ_LABELS } from './tables.js';
+import { CURRENCY_CODES } from './currency.js';
+
+// Build an ordered alternation of terminals for a lexical rule
+function alternation(items, indent = '    ') {
+  return items.join(`\n${indent}| `);
+}
+
+// Single letters stay case-sensitive; everything else matches any casing
+const unitSuffixes = UNIT_SPELLINGS.map(s =>
+  LOWERCASE_ONLY.has(s) ? `"${s}" ~alnum` : `caseInsensitive<${JSON.stringify(s)}> ~alnum`
+);
+
+const currencyCodes = [...CURRENCY_CODES].map(c => `caseInsensitive<"${c}"> ~alnum`);
+const timezones = TZ_LABELS.map(z => `"${z}" ~alnum`);
+
 export const grammarSource = String.raw`
 Sumthing {
   Line
     = Comment
     | CompoundInterest
-    | FromNow
+    | RelativeTime
     | TimezoneConversion
     | DateTime
     | Variable
@@ -35,8 +51,11 @@ Sumthing {
   offKw  = "off" ~alnum
   pctQWord = "%" | "percent" ~alnum
 
-  FromNow
-    = Expression fromKw nowKw
+  RelativeTime
+    = Expression fromKw nowKw   -- future
+    | Expression agoKw          -- past
+
+  agoKw = "ago" ~alnum
 
   // Left-recursive — ohm handles natively, gives left-associative trees
   Expression
@@ -53,7 +72,7 @@ Sumthing {
     | Power
 
   mulOp
-    = "*" | "/" | "\u00d7" | "\u00f7"
+    = "*" | "/" | "×" | "÷"
     | "x" ~letter | "times" ~alnum | "divided by" ~alnum | "divided" ~alnum
 
   Power
@@ -61,7 +80,8 @@ Sumthing {
     | Factor
 
   Factor
-    = "(" Expression ")"                            -- paren
+    = "-" Factor                                    -- neg
+    | "(" Expression ")"                            -- paren
     | PercentOff
     | PercentOf
     | PercentOn
@@ -73,6 +93,9 @@ Sumthing {
     | Sum
     | Prev
     | Average
+    | Minimum
+    | Maximum
+    | Count
     | VariableRef
 
   Percent
@@ -90,6 +113,19 @@ Sumthing {
   Average
     = avgKw
   avgKw = "avg" ~alnum | "average" ~alnum
+
+  // "min" is minutes, so aggregation uses the long forms only
+  Minimum
+    = minKw
+  minKw = "minimum" ~alnum | "lowest" ~alnum
+
+  Maximum
+    = maxKw
+  maxKw = "maximum" ~alnum | "highest" ~alnum
+
+  Count
+    = countKw
+  countKw = "count" ~alnum
 
   // --- Variables ---
   Variable
@@ -118,16 +154,10 @@ Sumthing {
     = currencySymbol number kSuffix?
 
   currencySymbol
-    = "$" | "\u20ac" | "\u00a3"
+    = "$" | "€" | "£"
 
   currencyCode
-    = caseInsensitive<"usd"> ~alnum | caseInsensitive<"eur"> ~alnum | caseInsensitive<"gbp"> ~alnum
-    | caseInsensitive<"aud"> ~alnum | caseInsensitive<"cad"> ~alnum | caseInsensitive<"nzd"> ~alnum
-    | caseInsensitive<"jpy"> ~alnum | caseInsensitive<"chf"> ~alnum | caseInsensitive<"cny"> ~alnum
-    | caseInsensitive<"inr"> ~alnum | caseInsensitive<"sgd"> ~alnum | caseInsensitive<"hkd"> ~alnum
-    | caseInsensitive<"krw"> ~alnum | caseInsensitive<"sek"> ~alnum | caseInsensitive<"nok"> ~alnum
-    | caseInsensitive<"dkk"> ~alnum | caseInsensitive<"brl"> ~alnum | caseInsensitive<"zar"> ~alnum
-    | caseInsensitive<"mxn"> ~alnum | caseInsensitive<"thb"> ~alnum
+    = ${alternation(currencyCodes)}
 
   kSuffix
     = "K" | "k"
@@ -192,16 +222,7 @@ Sumthing {
   ampm = "am" ~alnum | "pm" ~alnum
 
   timezone
-    = "AEST" ~alnum | "AEDT" ~alnum | "ACST" ~alnum | "AWST" ~alnum
-    | "NZST" ~alnum | "NZDT" ~alnum
-    | "JST" ~alnum | "KST" ~alnum | "IST" ~alnum
-    | "CET" ~alnum | "CEST" ~alnum | "EET" ~alnum | "EEST" ~alnum
-    | "GMT" ~alnum | "UTC" ~alnum | "BST" ~alnum
-    | "EST" ~alnum | "EDT" ~alnum
-    | "CST" ~alnum | "CDT" ~alnum
-    | "MST" ~alnum | "MDT" ~alnum
-    | "PST" ~alnum | "PDT" ~alnum
-    | "AKST" ~alnum | "AKDT" ~alnum | "HST" ~alnum
+    = ${alternation(timezones)}
 
   // --- Date/Time ---
   DateTime
@@ -229,6 +250,7 @@ Sumthing {
   reserved
     = ("sum" | "total" | "now" | "today"
       | "prev" | "previous" | "avg" | "average"
+      | "minimum" | "maximum" | "lowest" | "highest" | "count"
       | "is" | "x" | "to" | "what") ~alnum
     | currencyCode
 
@@ -239,49 +261,9 @@ Sumthing {
     | digit digit? digit? ("," digit digit digit)+               -- commaWhole
     | digit+                                                      -- whole
 
-  // --- Unit suffixes (order matters: longer first) ---
-  // Case-insensitive multi-char units use caseInsensitive<>
-  // "m" (meters) is lowercase-only to avoid conflict with M multiplier
+  // --- Unit suffixes (generated from tables.js, longest spelling first) ---
   unitSuffix
-    = caseInsensitive<"kilometres per hour"> ~alnum | caseInsensitive<"kilometers per hour"> ~alnum
-    | caseInsensitive<"kilometre per hour"> ~alnum | caseInsensitive<"kilometer per hour"> ~alnum
-    | caseInsensitive<"meters per second"> ~alnum | caseInsensitive<"meter per second"> ~alnum
-    | caseInsensitive<"metres per second"> ~alnum | caseInsensitive<"metre per second"> ~alnum
-    | caseInsensitive<"miles per hour"> ~alnum | caseInsensitive<"mile per hour"> ~alnum
-    | caseInsensitive<"feet per second"> ~alnum | caseInsensitive<"foot per second"> ~alnum
-    | caseInsensitive<"kmph"> ~alnum | caseInsensitive<"km/hr"> ~alnum
-    | caseInsensitive<"km/h"> ~alnum | caseInsensitive<"kph"> ~alnum | caseInsensitive<"kmh"> ~alnum
-    | caseInsensitive<"k/hr"> ~alnum
-    | caseInsensitive<"mph"> ~alnum
-    | caseInsensitive<"m/s"> ~alnum | caseInsensitive<"mps"> ~alnum
-    | caseInsensitive<"ft/s"> ~alnum | caseInsensitive<"fps"> ~alnum
-    | caseInsensitive<"knots"> ~alnum | caseInsensitive<"knot"> ~alnum | caseInsensitive<"kn"> ~alnum
-    | caseInsensitive<"tablespoons"> ~alnum | caseInsensitive<"tablespoon"> ~alnum | caseInsensitive<"tbsp"> ~alnum
-    | caseInsensitive<"teaspoons"> ~alnum | caseInsensitive<"teaspoon"> ~alnum | caseInsensitive<"tsp"> ~alnum
-    | caseInsensitive<"cups"> ~alnum | caseInsensitive<"cup"> ~alnum
-    | caseInsensitive<"fluid oz"> ~alnum | caseInsensitive<"fl oz"> ~alnum | caseInsensitive<"floz"> ~alnum
-    | caseInsensitive<"gallons"> ~alnum | caseInsensitive<"gallon"> ~alnum | caseInsensitive<"gal"> ~alnum
-    | caseInsensitive<"quarts"> ~alnum | caseInsensitive<"quart"> ~alnum | caseInsensitive<"qt"> ~alnum
-    | caseInsensitive<"pints"> ~alnum | caseInsensitive<"pint"> ~alnum | caseInsensitive<"pt"> ~alnum
-    | caseInsensitive<"grams"> ~alnum | caseInsensitive<"gram"> ~alnum
-    | caseInsensitive<"kg"> | caseInsensitive<"mg">
-    | caseInsensitive<"km"> | caseInsensitive<"cm"> | caseInsensitive<"mm">
-    | caseInsensitive<"ml"> | caseInsensitive<"kb"> | caseInsensitive<"mb"> | caseInsensitive<"gb">
-    | caseInsensitive<"inches"> ~alnum | caseInsensitive<"inch"> ~alnum
-    | caseInsensitive<"feet"> ~alnum | caseInsensitive<"foot"> ~alnum | caseInsensitive<"ft">
-    | caseInsensitive<"yards"> ~alnum | caseInsensitive<"yard"> ~alnum | caseInsensitive<"yd"> ~alnum
-    | caseInsensitive<"miles"> ~alnum | caseInsensitive<"mile"> ~alnum | caseInsensitive<"mi"> ~alnum
-    | caseInsensitive<"years"> ~alnum | caseInsensitive<"year"> ~alnum
-    | caseInsensitive<"months"> ~alnum | caseInsensitive<"month"> ~alnum
-    | caseInsensitive<"weeks"> ~alnum | caseInsensitive<"week"> ~alnum
-    | caseInsensitive<"hours"> ~alnum | caseInsensitive<"hour"> ~alnum
-    | caseInsensitive<"days"> ~alnum | caseInsensitive<"day"> ~alnum
-    | caseInsensitive<"mins"> ~alnum | caseInsensitive<"min"> ~alnum
-    | caseInsensitive<"secs"> ~alnum | caseInsensitive<"sec"> ~alnum
-    | caseInsensitive<"hrs"> ~alnum | caseInsensitive<"hr"> ~alnum
-    | caseInsensitive<"celsius"> ~alnum | caseInsensitive<"fahrenheit"> ~alnum | caseInsensitive<"kelvin"> ~alnum
-    | caseInsensitive<"g"> | caseInsensitive<"l"> | caseInsensitive<"b">
-    | "m" ~alnum | "f" ~alnum | "c" ~alnum
+    = ${alternation(unitSuffixes)}
     | "\"" | "'"
 }
 `;

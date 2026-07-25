@@ -5,6 +5,8 @@ import { fetchRates } from './currency.js';
 import { initTypingDemo } from './typing-demo.js';
 
 const SHEETS_KEY = 'sumthing';
+const THEME_KEY = 'sumthing_theme';
+const INTRO_KEY = 'sumthing_intro';
 const DEBOUNCE_MS = 300;
 
 const DEFAULT_INPUT = `// Convert units
@@ -92,17 +94,17 @@ const metrics = {
   paddingLeft: 0,
   lineHeight: 1,
   measureFont: '',
+  top: 0,
+  topStale: true,
 };
 
 const measureCtx = document.createElement('canvas').getContext('2d');
 const HAS_FIELD_SIZING = CSS.supports('field-sizing', 'content');
 
-const lockBody = (lock) => document.body.style.overflow = lock ? 'hidden' : '';
-
 function nextId() {
-  const used = state.sheets.map(s => s.id);
+  const used = new Set(state.sheets.map(s => s.id));
   let id = 1;
-  while (used.includes(id)) id++;
+  while (used.has(id)) id++;
   return id;
 }
 
@@ -242,34 +244,36 @@ function renderOutput(results) {
 
   for (let i = 0; i < results.length; i++) {
     const formatted = formatResult(results[i]);
-    const div = existing[i] || outputContainer.appendChild(
-      Object.assign(document.createElement('div'), { className: 'result-line' })
-    );
-    const btn = div.firstChild;
-    if (formatted) {
-      if (btn && btn.tagName === 'BUTTON') {
-        if (btn.textContent !== formatted) {
-          btn.textContent = formatted;
-          btn.onclick = () => copyToClipboard(formatted);
-        }
-      } else {
-        div.innerHTML = '';
-        const newBtn = document.createElement('button');
-        newBtn.className = 'result-value';
-        newBtn.textContent = formatted;
-        newBtn.title = 'Click to copy';
-        newBtn.onclick = () => copyToClipboard(formatted);
-        div.appendChild(newBtn);
-      }
-    } else if (btn) {
-      div.innerHTML = '';
+    let div = existing[i];
+    if (!div) {
+      div = document.createElement('div');
+      div.className = 'result-line';
+      outputContainer.appendChild(div);
     }
+    let btn = div.firstChild;
+    if (!formatted) {
+      if (btn) div.textContent = '';
+      continue;
+    }
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'result-value';
+      btn.title = 'Click to copy';
+      div.appendChild(btn);
+    }
+    if (btn.textContent !== formatted) btn.textContent = formatted;
   }
 
   while (existing.length > results.length) {
     outputContainer.removeChild(outputContainer.lastChild);
   }
 }
+
+// One delegated listener instead of a handler per result
+outputContainer.addEventListener('click', (e) => {
+  const btn = e.target.closest('.result-value');
+  if (btn) copyToClipboard(btn.textContent);
+});
 
 function autoResize() {
   if (!HAS_FIELD_SIZING) {
@@ -297,7 +301,8 @@ function renderSheetBar() {
       sheetBar.appendChild(tab);
     }
     const label = sheetPreview(sheet);
-    if (tab.dataset.id !== sheet.id || tab.dataset.label !== label) {
+    // dataset values are strings — compare as strings or the tab rebuilds every render
+    if (tab.dataset.id !== String(sheet.id) || tab.dataset.label !== label) {
       tab.dataset.id = sheet.id;
       tab.dataset.label = label;
       tab.innerHTML = '';
@@ -317,16 +322,20 @@ function renderSheetBar() {
   }
 }
 
+// Load the active sheet's content into the editor and refresh everything
+function showActiveSheet() {
+  textarea.value = getActiveSheet().content;
+  prevLineCount = textarea.value.split('\n').length;
+  metrics.topStale = true;
+  syncVisuals();
+  evalAndRender();
+}
+
 function switchToSheet(id) {
   if (id === state.activeSheetId) return;
   saveActiveSheet();
-
   state.activeSheetId = id;
-  const sheet = getActiveSheet();
-  textarea.value = sheet.content;
-  prevLineCount = textarea.value.split('\n').length;
-  syncVisuals();
-  evalAndRender();
+  showActiveSheet();
   saveSheets();
   renderSheetBar();
   textarea.focus();
@@ -334,14 +343,10 @@ function switchToSheet(id) {
 
 function addSheet() {
   saveActiveSheet();
-  const defaultContent = `// New sheet\n1 x 2`;
-  const sheet = { id: nextId(), content: defaultContent, lastEdited: Date.now() };
+  const sheet = { id: nextId(), content: `// New sheet\n1 x 2`, lastEdited: Date.now() };
   state.sheets.push(sheet);
   state.activeSheetId = sheet.id;
-  textarea.value = defaultContent;
-  prevLineCount = textarea.value.split('\n').length;
-  syncVisuals();
-  evalAndRender();
+  showActiveSheet();
   saveSheets();
   renderSheetBar();
   textarea.focus();
@@ -370,11 +375,7 @@ function deleteSheet(id) {
   if (id === state.activeSheetId) {
     const sorted = [...state.sheets].sort((a, b) => b.lastEdited - a.lastEdited);
     state.activeSheetId = sorted[0].id;
-    const sheet = getActiveSheet();
-    textarea.value = sheet.content;
-    prevLineCount = textarea.value.split('\n').length;
-    syncVisuals();
-    evalAndRender();
+    showActiveSheet();
   }
 
   saveSheets();
@@ -404,8 +405,6 @@ function showToast() {
   clearTimeout(state.toastTimer);
   state.toastTimer = setTimeout(() => toast.classList.remove('visible'), 1200);
 }
-
-const THEME_KEY = 'sumthing_theme';
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
@@ -475,6 +474,7 @@ let prevLineCount = 0;
 
 textarea.addEventListener('input', () => {
   syncVisuals();
+  metrics.topStale = true;
   const lineCount = textarea.value.split('\n').length;
   clearTimeout(state.debounceTimer);
   if (lineCount !== prevLineCount) {
@@ -505,10 +505,16 @@ function cacheTextareaMetrics() {
   metrics.paddingLeft = parseFloat(style.paddingLeft);
   metrics.lineHeight = parseFloat(style.lineHeight);
   metrics.measureFont = `${style.fontSize} ${style.fontFamily}`;
+  metrics.topStale = true;
 }
 
 textarea.addEventListener('mousemove', (e) => {
-  const y = e.clientY - textarea.getBoundingClientRect().top - metrics.paddingTop + textarea.scrollTop;
+  // Reading the rect forces layout, so only re-read it after something moved
+  if (metrics.topStale) {
+    metrics.top = textarea.getBoundingClientRect().top;
+    metrics.topStale = false;
+  }
+  const y = e.clientY - metrics.top - metrics.paddingTop + textarea.scrollTop;
   const resultLine = outputContainer.children[Math.floor(y / metrics.lineHeight)] || null;
   if (resultLine === state.activeResultLine) return;
   if (state.activeResultLine) state.activeResultLine.classList.remove('active');
@@ -523,28 +529,29 @@ textarea.addEventListener('mouseleave', () => {
   }
 });
 
+// Page scroll moves the textarea, so the cached rect top needs re-reading
+window.addEventListener('scroll', () => { metrics.topStale = true; }, { passive: true });
+
 addSheetBtn.addEventListener('click', addSheet);
 shareSheetBtn.addEventListener('click', shareSheet);
 
 let stopTypingDemo;
 
+// Body scroll lock comes from CSS: body:has(dialog[open])
 function showIntro() {
   introDialog.classList.remove('is-entering');
   requestAnimationFrame(() => {
     introDialog.showModal();
     introDialog.classList.add('is-entering');
-    lockBody(true);
     stopTypingDemo = initTypingDemo(typingDemo);
   });
 }
 
 heading.addEventListener('click', showIntro);
 
-helpBtn.addEventListener('click', () => { helpDialog.showModal(); lockBody(true); });
-helpDialog.addEventListener('close', () => { lockBody(false); });
+helpBtn.addEventListener('click', () => helpDialog.showModal());
 introDialog.addEventListener('close', () => {
-  localStorage.setItem('sumthing_intro', '1');
-  lockBody(false);
+  localStorage.setItem(INTRO_KEY, '1');
   introDialog.classList.remove('is-entering');
   if (stopTypingDemo) stopTypingDemo();
 });
@@ -592,12 +599,8 @@ if (eyes.length && pupils.length) {
 async function init() {
   initTheme();
   loadSheets();
-  const sheet = getActiveSheet();
-  textarea.value = sheet.content;
-  prevLineCount = textarea.value.split('\n').length;
-  syncVisuals();
   cacheTextareaMetrics();
-  evalAndRender();
+  showActiveSheet();
   renderSheetBar();
   window.addEventListener('resize', () => {
     state.isMobile = window.innerWidth <= MOBILE_BP;
@@ -607,7 +610,7 @@ async function init() {
   });
   textarea.focus();
 
-  if (!localStorage.getItem('sumthing_intro')) {
+  if (!localStorage.getItem(INTRO_KEY)) {
     showIntro();
   }
 

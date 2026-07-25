@@ -18,14 +18,22 @@ const REGION_TO_CURRENCY = {
   GR: 'eur', LU: 'eur',
 };
 
+const RATES_KEY = 'sumthing_rates';
+const RATES_TTL = 24 * 60 * 60 * 1000;
+const FETCH_TIMEOUT = 5000;
+
+const RATE_URLS = [
+  'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+  'https://latest.currency-api.pages.dev/v1/currencies/usd.json',
+];
+
 let defaultCode = null;
 let ratesCache = null;
 
 export function getDefaultCurrencyCode() {
   if (defaultCode) return defaultCode;
   try {
-    const locale = navigator.language || 'en-US';
-    const region = locale.split('-')[1]?.toUpperCase();
+    const region = (navigator.language || 'en-US').split('-')[1]?.toUpperCase();
     defaultCode = (region && REGION_TO_CURRENCY[region]) || 'usd';
   } catch {
     defaultCode = 'usd';
@@ -33,22 +41,46 @@ export function getDefaultCurrencyCode() {
   return defaultCode;
 }
 
+// Keep only the codes we support, so the stored copy stays small
+function pickSupported(rates) {
+  const picked = { usd: 1 };
+  for (const code of CURRENCY_CODES) {
+    if (rates[code] != null) picked[code] = rates[code];
+  }
+  return picked;
+}
+
+function readStoredRates() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(RATES_KEY));
+    if (stored?.rates && typeof stored.at === 'number') return stored;
+  } catch {}
+  return null;
+}
+
 export async function fetchRates() {
-  const urls = [
-    'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
-    'https://latest.currency-api.pages.dev/v1/currencies/usd.json',
-  ];
-  for (const url of urls) {
+  // Use yesterday's rates immediately, and skip the network if they're still fresh
+  const stored = readStoredRates();
+  if (stored) {
+    ratesCache = stored.rates;
+    if (Date.now() - stored.at < RATES_TTL) return true;
+  }
+
+  for (const url of RATE_URLS) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
       if (!res.ok) continue;
       const data = await res.json();
-      ratesCache = data.usd;
-      ratesCache.usd = 1;
+      ratesCache = pickSupported(data.usd);
+      try {
+        localStorage.setItem(RATES_KEY, JSON.stringify({ at: Date.now(), rates: ratesCache }));
+      } catch {}
       return true;
     } catch { continue; }
   }
-  return false;
+
+  // Offline with an expired copy is still better than no rates at all
+  return stored !== null;
 }
 
 export function convertCurrency(amount, fromCode, toCode) {
@@ -57,8 +89,4 @@ export function convertCurrency(amount, fromCode, toCode) {
   const toRate = ratesCache[toCode];
   if (fromRate == null || toRate == null) return null;
   return amount / fromRate * toRate;
-}
-
-export function ratesReady() {
-  return ratesCache !== null;
 }

@@ -35,6 +35,7 @@ Standard math with natural language alternatives.
 (5 + 3) * 2
 100 and 50     // addition
 100 without 10 // subtraction
+-5 + 3         // negative numbers
 ```
 
 ## Numbers
@@ -63,7 +64,8 @@ $50K + $25K
 
 ### Currency conversion
 
-Convert between 20 supported currencies using live exchange rates.
+Convert between 20 supported currencies using live exchange rates. Rates are cached
+for 24 hours, so conversions keep working offline.
 
 ```
 50 USD in EUR
@@ -112,9 +114,14 @@ transport: $3.50 * days
 
 ### Aggregation
 
+Each of these consumes the `:` variables since the last aggregation.
+
 ```
 sum        // or total — sums all : variables since last sum
 avg        // or average
+minimum    // or lowest
+maximum    // or highest
+count      // how many values
 prev + 5   // previous result
 ```
 
@@ -134,13 +141,17 @@ Convert between units with `in`, `to`, `into`, or `as`.
 
 | Category    | Units                                                         |
 | ----------- | ------------------------------------------------------------- |
-| Length      | mm, cm, m, km, inch/inches ("), feet/ft ('), yard/yd, mile/mi |
-| Mass        | mg, g/grams, kg                                               |
-| Volume      | tsp, tbsp, floz, cup, pint/pt, quart/qt, l, gallon/gal, ml    |
-| Data        | b, kb, mb, gb                                                 |
-| Time        | sec/secs, min/mins, hr/hrs, day/days, week/weeks              |
+| Length      | mm, cm, m/metres, km/kilometres, inch/inches ("), feet/ft ('), yard/yd, mile/mi |
+| Mass        | mg, g/grams, kg/kilograms, oz/ounces, lb/lbs/pounds, stone, t/tonnes |
+| Area        | sqm/m2/square metres, sqft/ft2/square feet, acre/acres, ha/hectares, sqkm/km2, sqmi |
+| Volume      | ml, tsp, tbsp, floz, cup, pint/pt, quart/qt, l/litres, gallon/gal |
+| Data        | b/bytes, kb, mb, gb, tb                                       |
+| Time        | ms, sec/seconds, min/minutes, hr/hours, day/days, week/weeks   |
 | Speed       | km/h (kph, kmh, kmph, kilometers per hour), mph (miles per hour), m/s (mps, meters per second), ft/s (fps, feet per second), kn/knot/knots |
 | Temperature | celsius/c, fahrenheit/f, kelvin/k                             |
+
+Results stay in metric by default, but units like `lb`, `oz` and `sqft` are kept when
+you use them: `5 lb + 3 lb` is `8 lb`, while `20kg plus 1900g` is `21.9 kg`.
 
 Volume and mass units can be cross-converted using water density (1 ml = 1 g):
 
@@ -154,9 +165,11 @@ How many cups in 1500 ml
 
 ### Fractional units
 
+No space between the fraction and the unit, or the `/` reads as division.
+
 ```
-1/2 inch + 1/4 inch
-3/4 ft
+1/2inch + 1/4inch
+3/4ft
 ```
 
 ### Cross-unit arithmetic
@@ -196,6 +209,7 @@ today                  // current date
 now                    // current date and time
 5 days from now
 2 hours from now
+5 days ago
 weeks in 4 years       // 208.71
 ```
 

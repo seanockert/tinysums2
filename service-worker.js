@@ -1,7 +1,8 @@
-const CACHE_NAME = 'sumthing-006';
+const CACHE_NAME = 'sumthing-007';
 const urlsToCache = [
   '/',
   '/index.html',
+  '/manifest.json',
   '/icon-192.png',
   '/icon-192-filled.png',
   '/scripts/ohm.min.js',
@@ -11,6 +12,7 @@ const urlsToCache = [
   '/scripts/highlighter.js',
   '/scripts/currency.js',
   '/scripts/grammar.js',
+  '/scripts/tables.js',
   '/scripts/typing-demo.js',
 ];
 
@@ -52,7 +54,7 @@ self.addEventListener('fetch', (event) => {
               .then((cache) => cache.put(event.request, responseToCache));
             return response;
           })
-          .catch(() => {
+          .catch((error) => {
             if (event.request.mode === 'navigate') {
               return caches.match('/index.html');
             }

@@ -1,5 +1,6 @@
 // Formatter — converts Result objects to display strings
-const DISPLAY_UNITS = { kph: 'km/h', mps: 'm/s', fps: 'ft/s' };
+import { UNIT_DISPLAY } from './tables.js';
+
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -10,58 +11,46 @@ const numberFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
+// Below 0.01 two decimals would round to "0", so switch to significant digits
+const smallFormatter = new Intl.NumberFormat('en-US', {
+  maximumSignificantDigits: 3,
+});
+
+function formatNumber(value) {
+  if (value !== 0 && Math.abs(value) < 0.01) return smallFormatter.format(value);
+  return numberFormatter.format(value);
+}
+
 export function formatResult(res) {
   if (!res || res.value === undefined) return '';
-
-  // Timezone conversion result
   if (res.timezone) {
     return formatTimeInZone(new Date(res.value), res.timezone.iana, res.timezone.label);
   }
+  if (res.isDate) return formatDate(new Date(res.value));
 
-  // Date/time result (value is a timestamp)
-  if (res.value > 1e12 && !res.prefix && !res.unit) {
-    return formatDate(new Date(res.value));
-  }
+  // Divide by zero and the like
+  if (!Number.isFinite(res.value)) return '';
 
-  // Bare percentage
-  if (res.isPercent) {
-    const pct = Math.round(res.value * 10000) / 100;
-    return numberFormatter.format(pct) + '%';
-  }
-
-  const rounded = Math.round(res.value * 100) / 100;
+  if (res.isPercent) return formatNumber(res.value * 100) + '%';
 
   // Currency
   if (res.currencyCode) {
-    if (res.prefix) {
-      return res.prefix + currencyFormatter.format(rounded);
-    }
-    return currencyFormatter.format(rounded) + ' ' + res.currencyCode.toUpperCase();
+    if (res.prefix) return res.prefix + currencyFormatter.format(res.value);
+    return currencyFormatter.format(res.value) + ' ' + res.currencyCode.toUpperCase();
   }
-  if (res.prefix) {
-    return res.prefix + currencyFormatter.format(rounded);
-  }
+  if (res.prefix) return res.prefix + currencyFormatter.format(res.value);
 
   // Percentage result (from percentage queries)
-  if (res.unit === '%') {
-    return numberFormatter.format(rounded) + '%';
-  }
-
-  // Temperature
-  if (res.unitGroup === 'temperature') {
-    const symbols = { c: '\u00b0C', f: '\u00b0F', k: 'K' };
-    return numberFormatter.format(rounded) + ' ' + (symbols[res.unit] || res.unit);
-  }
+  if (res.unit === '%') return formatNumber(res.value) + '%';
 
   // Quantity with units
   if (res.unit) {
-    const display = DISPLAY_UNITS[res.unit] || res.unit;
+    const display = UNIT_DISPLAY[res.unit] || res.unit;
     const sep = (display === '"' || display === "'") ? '' : ' ';
-    return numberFormatter.format(rounded) + sep + display;
+    return formatNumber(res.value) + sep + display;
   }
 
-  // Plain number
-  return numberFormatter.format(rounded);
+  return formatNumber(res.value);
 }
 
 const tzFormatCache = new Map();
@@ -84,10 +73,8 @@ function formatDate(date) {
   const day = date.getDate();
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
-  let hours = date.getHours();
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours = hours % 12 || 12;
+  const ampm = date.getHours() >= 12 ? 'pm' : 'am';
+  const hours = date.getHours() % 12 || 12;
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 }
-
