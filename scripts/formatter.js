@@ -1,9 +1,14 @@
 // Formatter — converts Result objects to display strings
 import { UNIT_DISPLAY } from './tables.js';
+import { currencyPrefix, ZERO_DECIMAL_CODES } from './currency.js';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+});
+
+const wholeCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
 });
 
 const numberFormatter = new Intl.NumberFormat('en-US', {
@@ -33,10 +38,13 @@ export function formatResult(res) {
 
   if (res.isPercent) return formatNumber(res.value * 100) + '%';
 
-  // Currency
+  // The code decides the prefix, not whatever got carried along
   if (res.currencyCode) {
-    if (res.prefix) return res.prefix + currencyFormatter.format(res.value);
-    return currencyFormatter.format(res.value) + ' ' + res.currencyCode.toUpperCase();
+    const format = ZERO_DECIMAL_CODES.has(res.currencyCode)
+      ? wholeCurrencyFormatter.format(res.value)
+      : currencyFormatter.format(res.value);
+    const prefix = currencyPrefix(res.currencyCode);
+    return prefix ? prefix + format : format + ' ' + res.currencyCode.toUpperCase();
   }
   if (res.prefix) return res.prefix + currencyFormatter.format(res.value);
 

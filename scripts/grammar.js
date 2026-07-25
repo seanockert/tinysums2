@@ -1,5 +1,5 @@
 import { UNIT_SPELLINGS, LOWERCASE_ONLY, TZ_LABELS } from './tables.js';
-import { CURRENCY_CODES } from './currency.js';
+import { CURRENCY_CODES, CURRENCY_SYMBOLS } from './currency.js';
 
 // Build an ordered alternation of terminals for a lexical rule
 function alternation(items, indent = '    ') {
@@ -12,6 +12,10 @@ const unitSuffixes = UNIT_SPELLINGS.map(s =>
 );
 
 const currencyCodes = [...CURRENCY_CODES].map(c => `caseInsensitive<"${c}"> ~alnum`);
+// Lettered prefixes match any casing (au$100)
+const currencySymbols = CURRENCY_SYMBOLS.map(s =>
+  /[a-z]/i.test(s) ? `caseInsensitive<${JSON.stringify(s)}>` : JSON.stringify(s)
+);
 const timezones = TZ_LABELS.map(z => `"${z}" ~alnum`);
 
 export const grammarSource = String.raw`
@@ -33,8 +37,10 @@ Sumthing {
     | Expression toKw currencyCode                   -- toCurrency
     | Expression inKw unitSuffix                     -- conversion
     | Expression toKw unitSuffix                     -- toConversion
+    | Expression intoKw currencyCode                 -- intoCurrency
     | Expression intoKw unitSuffix                   -- intoConversion
     | Expression asKw aKw? pctWord                   -- asPercent
+    | Expression asKw currencyCode                   -- asCurrency
     | Expression asKw unitSuffix                     -- asConversion
     | howKw manyKw unitSuffix inKw Expression          -- howManyConversion
     | unitSuffix inKw Expression                      -- reverseConversion
@@ -147,14 +153,15 @@ Sumthing {
     = varName
 
   // --- Currency ---
+  // Optional symbol: in "$100 AUD" the code wins
   CurrencyWithCode
-    = number kSuffix? currencyCode
+    = currencySymbol? number kSuffix? currencyCode
 
   Currency
     = currencySymbol number kSuffix?
 
   currencySymbol
-    = "$" | "€" | "£"
+    = ${alternation(currencySymbols)}
 
   currencyCode
     = ${alternation(currencyCodes)}
@@ -173,14 +180,16 @@ Sumthing {
     = number "%" "on" ~alnum Expression
 
   // --- Compound Interest ---
+  // Duration is an Expression, so "5 years" is a time quantity
+  // Longest first: PEG won't retry a choice after a later term fails
   CompoundInterest
-    = Expression forKw Expression yearWord atKw number "%" compoundingKw? frequencyWord?  -- full
+    = Expression forKw Expression atKw number "%" compoundingKw? frequencyWord?            -- full
+    | Expression atKw number "%" paKw? compoundingKw? frequencyWord? forKw Expression      -- rateFirst
     | Expression atKw number "%" paKw                                                      -- simple
 
   atKw = "at" ~alnum
   paKw = "pa" ~alnum
   forKw = "for" ~alnum
-  yearWord = "years" ~alnum | "year" ~alnum
   compoundingKw = "compounding" ~alnum
   frequencyWord
     = "monthly" ~alnum | "quarterly" ~alnum | "annually" ~alnum

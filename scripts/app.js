@@ -1,7 +1,7 @@
 import { evaluate, getGrammarAndSemantics } from './evaluator.js';
 import { formatResult } from './formatter.js';
 import { highlightAll } from './highlighter.js';
-import { fetchRates } from './currency.js';
+import { fetchRates, getDefaultCurrencyCode } from './currency.js';
 import { initTypingDemo } from './typing-demo.js';
 
 const SHEETS_KEY = 'sumthing';
@@ -613,6 +613,9 @@ async function init() {
   if (!localStorage.getItem(INTRO_KEY)) {
     showIntro();
   }
+
+  // Warm the ~50ms timezone lookup here, not on the first "$" typed
+  getDefaultCurrencyCode();
 
   const success = await fetchRates();
   if (success) evalAndRender();

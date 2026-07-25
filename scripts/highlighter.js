@@ -1,5 +1,5 @@
 import { UNIT_SPELLINGS, TZ_LABELS } from './tables.js';
-import { CURRENCY_CODES } from './currency.js';
+import { CURRENCY_CODES, CURRENCY_SYMBOLS } from './currency.js';
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -12,13 +12,21 @@ const UNITS = UNIT_SPELLINGS.map(escapeRe).join('|');
 const CODES = [...CURRENCY_CODES].join('|');
 const ZONES = TZ_LABELS.join('|');
 
+// Same symbols the grammar uses; the bare chars feed the lookbehinds below
+const SYMBOLS = CURRENCY_SYMBOLS.map(escapeRe).join('|');
+const SYMBOL_CHARS = [...new Set(CURRENCY_SYMBOLS.join('').replace(/[a-z]/gi, ''))].join('');
+
+// \w guard keeps "AU$" out of mid-word
+const RE_CURRENCY_AMOUNT = new RegExp(
+  `(?<!\\w)(${SYMBOLS})(\\d+(?:,\\d+)*(?:\\.\\d+)?[Kk]?)`, 'gi');
 const RE_FRAC_UNIT = new RegExp(`(\\d+\\/\\d+)(${UNITS})\\b`, 'gi');
 const RE_FRAC_SYMBOL = /(\d+\/\d+)(&quot;|')/g;
-const RE_NUM_UNIT = new RegExp(`(?<!["$€£\\d])(\\d+(?:,\\d+)*(?:\\.\\d+)?)(${UNITS})\\b`, 'gi');
+const RE_NUM_UNIT = new RegExp(`(?<!["${SYMBOL_CHARS}\\d])(\\d+(?:,\\d+)*(?:\\.\\d+)?)(${UNITS})\\b`, 'gi');
 const RE_NUM_SYMBOL = /(?<!<span[^>]*>)(\d+(?:,\d+)*(?:\.\d+)?)((&quot;)|')/g;
 const RE_TIME_COLON = /\b(\d{1,2}:\d{2}(?:am|pm)?)\b/gi;
 const RE_TIME_SUFFIX = /\b(\d{1,2}(?:am|pm))\b/gi;
-const RE_PLAIN_NUM = /(?<!<span[^>]*>)(?<![.$€£\d])(\d+(?:,\d+)*(?:\.\d+)?[Kk]?)(?![^<]*<\/span>)/g;
+const RE_PLAIN_NUM = new RegExp(
+  `(?<!<span[^>]*>)(?<![.${SYMBOL_CHARS}\\d])(\\d+(?:,\\d+)*(?:\\.\\d+)?[Kk]?)(?![^<]*<\\/span>)`, 'g');
 const RE_NUM_CURRENCY = new RegExp(`(?<!<span[^>]*>)(\\d+(?:,\\d+)*(?:\\.\\d+)?[Kk]?\\s*)(${CODES})\\b`, 'gi');
 const RE_TIMEZONE = new RegExp(`\\b(${ZONES})\\b`, 'g');
 const RE_CURRENCY_STANDALONE = new RegExp(`(?<![<\\w])\\b(${CODES})\\b(?![^<]*<\\/span>)`, 'gi');
@@ -43,8 +51,8 @@ export function highlightLine(line, definedVars) {
   // Variable name before = or :
   result = result.replace(/^([a-zA-Z_]\w*)(\s*[=:])/, '<span class="hl-variable">$1</span>$2');
 
-  // Currency amounts
-  result = result.replace(/([$€£])(\d+(?:,\d+)*(?:\.\d+)?[Kk]?)/g, '<span class="hl-number">$1$2</span>');
+  // Currency amounts ($100, AU$100, ¥1000)
+  result = result.replace(RE_CURRENCY_AMOUNT, '<span class="hl-number">$1$2</span>');
 
   // Percentages
   result = result.replace(/(\d+(?:,\d+)*(?:\.\d+)?%)/g, '<span class="hl-number">$1</span>');

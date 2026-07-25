@@ -51,7 +51,7 @@ $100K          // $100,000
 
 ## Currency
 
-Supports `$`, `€`, and `£` symbol prefixes, plus currency codes.
+Symbols, prefixed symbols, and currency codes all work.
 
 ```
 $100 + $50
@@ -60,6 +60,34 @@ $100 + $50
 $50K + $25K
 100 USD + 50 EUR
 1000 JPY
+¥1000 + ₹500
+```
+
+**Symbols:** `$`, `€`, `£`, `¥`, `₹`, `₩`, `฿`, and the prefixed dollars
+`AU$`/`A$`, `US$`, `NZ$`, `CA$`/`C$`, `HK$`, `S$`, `MX$`, `R$`, plus `CN¥`.
+
+### Which dollar is `$`?
+
+A bare `$` is your own currency, from your timezone (falling back to browser
+language). In Sydney `$100` is A$100; in New York it's US$100. Same for `¥`,
+which is yen unless you're in China. If your currency doesn't use the symbol —
+kronor, say — `$` stays US dollars.
+
+To be explicit, name it. Both of these are AUD:
+
+```
+AU$100 in JPY
+$100 AUD in JPY
+```
+
+Other currencies keep their qualifier so a conversion can't be misread as local
+money: `100 USD` shows as `US$100.00`.
+
+Guessed wrong? Some browsers (Brave, Tor) rewrite the language they report.
+Pin it from the console:
+
+```js
+localStorage.sumthing_currency = 'aud'
 ```
 
 ### Currency conversion
@@ -72,6 +100,7 @@ for 24 hours, so conversions keep working offline.
 $100 to GBP
 1000 JPY in AUD
 €500 as CAD
+US$100 into NZD
 ```
 
 **Supported currencies:** USD, EUR, GBP, AUD, CAD, NZD, JPY, CHF, CNY, INR, SGD, HKD, KRW, SEK, NOK, DKK, BRL, ZAR, MXN, THB
@@ -185,9 +214,12 @@ No space between the fraction and the unit, or the `/` reads as division.
 $600 at 5% pa                              // 1 year, monthly compounding
 $1000 for 5 years at 3% monthly
 $600 for 10 years at 5% compounding quarterly
+$1000 at 5% for 10 years                   // rate first also works
+$1000 for 18 months at 6% monthly          // any time unit
 ```
 
 Frequencies: `monthly`, `quarterly`, `annually`, `yearly`, `daily`, `weekly`
+(monthly if you don't say). A duration with no unit means years.
 
 ## Timezone conversion
 

@@ -1,5 +1,5 @@
 import { grammarSource } from './grammar.js';
-import { convertCurrency, getDefaultCurrencyCode, SYMBOL_TO_CODE, CODE_TO_SYMBOL } from './currency.js';
+import { convertCurrency, getDefaultCurrencyCode, resolveSymbol, currencyPrefix } from './currency.js';
 import {
   UNIT_GROUPS, TEMP_CONVERSIONS, UNIT_TO_GROUP, SORTED_UNITS, normalizeUnit, TZ_MAP,
 } from './tables.js';
@@ -92,7 +92,7 @@ function combineResults(a, b, subtract = false) {
   if (a.currencyCode && b.currencyCode && a.currencyCode !== b.currencyCode) {
     const bConverted = convertCurrency(b.value, b.currencyCode, a.currencyCode);
     if (bConverted !== null) {
-      return result(op(a.value, bConverted), a.prefix || CODE_TO_SYMBOL[a.currencyCode] || '', null, 'currency', a.currencyCode);
+      return result(op(a.value, bConverted), a.prefix || currencyPrefix(a.currencyCode), null, 'currency', a.currencyCode);
     }
   }
   if (a.currencyCode || b.currencyCode) {
@@ -175,12 +175,17 @@ export class State {
   aggregate(fn) {
     const entries = this.sumAccumulator;
     this.sumAccumulator = [];
-    let prefix = '', unit = null, unitGroup = null;
+    let prefix = '', unit = null, unitGroup = null, currency = null, mixed = false;
     for (const v of entries) {
       if (v.prefix) prefix = v.prefix;
       if (v.unit) { unit = v.unit; unitGroup = v.unitGroup; }
+      // Keep the code only while they agree, so yen totals print whole
+      if (v.currencyCode) {
+        if (currency && currency !== v.currencyCode) mixed = true;
+        currency = v.currencyCode;
+      }
     }
-    return result(fn(entries.map(v => v.value)), prefix, unit, unitGroup);
+    return result(fn(entries.map(v => v.value)), prefix, unit, unitGroup, mixed ? null : currency);
   }
 
   computeSum() { return this.aggregate(sumValues); }
@@ -241,6 +246,22 @@ function compound(principal, annualRate, years, frequency = 12) {
   return principal * Math.pow(1 + r / frequency, frequency * years);
 }
 
+const FREQUENCIES = { monthly: 12, quarterly: 4, annually: 1, yearly: 1, daily: 365, weekly: 52 };
+
+// Bare durations are years
+function durationYears(val) {
+  if (val.unitGroup !== 'time') return val.value;
+  return toBase(val.value, val.unit).value / UNIT_GROUPS.time.year;
+}
+
+function evalCompound(state, expr, durationExpr, rate, freqWord) {
+  const val = expr.eval(state);
+  const years = durationYears(durationExpr.eval(state));
+  const frequency = FREQUENCIES[freqWord.sourceString.trim().toLowerCase()] || 12;
+  const accumulated = compound(val.value, parseNum(rate.sourceString), years, frequency);
+  return result(accumulated, val.prefix, val.unit, val.unitGroup, val.currencyCode);
+}
+
 function convertUnits(val, targetUnitStr) {
   const target = normalizeUnit(targetUnitStr);
   const group = UNIT_TO_GROUP[target];
@@ -258,7 +279,7 @@ function evalCurrencyConversion(val, targetCodeNode) {
   const fromCode = val.currencyCode || getDefaultCurrencyCode();
   const converted = convertCurrency(val.value, fromCode, toCode);
   if (converted === null) return val;
-  return result(converted, CODE_TO_SYMBOL[toCode] || '', null, 'currency', toCode);
+  return result(converted, currencyPrefix(toCode), null, 'currency', toCode);
 }
 
 function normalizeAmPm(h, period) {
@@ -322,6 +343,12 @@ export function getGrammarAndSemantics() {
       return evalCurrencyConversion(expr.eval(this.args.state), targetCode);
     },
     Calculation_toCurrency(expr, _toKw, targetCode) {
+      return evalCurrencyConversion(expr.eval(this.args.state), targetCode);
+    },
+    Calculation_intoCurrency(expr, _intoKw, targetCode) {
+      return evalCurrencyConversion(expr.eval(this.args.state), targetCode);
+    },
+    Calculation_asCurrency(expr, _asKw, targetCode) {
       return evalCurrencyConversion(expr.eval(this.args.state), targetCode);
     },
     Calculation_conversion(expr, _inKw, targetUnit) {
@@ -414,18 +441,19 @@ export function getGrammarAndSemantics() {
     },
 
     // --- Currency ---
-    CurrencyWithCode(num, kSuffix, codeNode) {
+    // Symbol ignored: the code wins
+    CurrencyWithCode(_symbol, num, kSuffix, codeNode) {
       let val = parseNum(num.sourceString);
       if (kSuffix.sourceString) val *= 1000;
       const code = codeNode.sourceString.trim().toLowerCase();
-      return result(val, CODE_TO_SYMBOL[code] || '', null, 'currency', code);
+      return result(val, currencyPrefix(code), null, 'currency', code);
     },
 
     Currency(symbol, num, kSuffix) {
       let val = parseNum(num.sourceString);
       if (kSuffix.sourceString) val *= 1000;
-      const sym = symbol.sourceString;
-      return result(val, sym, null, 'currency', SYMBOL_TO_CODE[sym] ?? getDefaultCurrencyCode());
+      const code = resolveSymbol(symbol.sourceString);
+      return result(val, currencyPrefix(code), null, 'currency', code);
     },
 
     // --- Numbers ---
@@ -474,14 +502,11 @@ export function getGrammarAndSemantics() {
     },
 
     // --- Compound Interest ---
-    CompoundInterest_full(expr, _forKw, durationExpr, _yearWord, _atKw, rate, _pct, _compKw, freqWord) {
-      const s = this.args.state;
-      const val = expr.eval(s);
-      const years = durationExpr.eval(s).value;
-      const freqMap = { monthly: 12, quarterly: 4, annually: 1, yearly: 1, daily: 365, weekly: 52 };
-      const frequency = freqMap[freqWord.sourceString.trim().toLowerCase()] || 12;
-      const accumulated = compound(val.value, parseNum(rate.sourceString), years, frequency);
-      return result(accumulated, val.prefix, val.unit, val.unitGroup, val.currencyCode);
+    CompoundInterest_full(expr, _forKw, durationExpr, _atKw, rate, _pct, _compKw, freqWord) {
+      return evalCompound(this.args.state, expr, durationExpr, rate, freqWord);
+    },
+    CompoundInterest_rateFirst(expr, _atKw, rate, _pct, _paKw, _compKw, freqWord, _forKw, durationExpr) {
+      return evalCompound(this.args.state, expr, durationExpr, rate, freqWord);
     },
     CompoundInterest_simple(expr, _atKw, rate, _pct, _paKw) {
       const val = expr.eval(this.args.state);
